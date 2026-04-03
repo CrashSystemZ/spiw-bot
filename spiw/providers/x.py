@@ -156,7 +156,14 @@ class XPostProvider(YtDlpProviderBase):
     @staticmethod
     def _pick_tweet_description(tweet: dict) -> str | None:
         text = tweet.get("text") or (tweet.get("raw_text") or {}).get("text")
-        return str(text).strip() or None if text else None
+        if not text:
+            return None
+        desc = str(text).strip()
+        if not desc:
+            return None
+        import re
+        desc = re.sub(r"\s*https?://t\.co/\S+\s*$", "", desc).strip()
+        return desc or None
 
     @staticmethod
     def _pick_thumbnail(tweet: dict, items: list[ResolvedMediaItem]) -> str | None:
