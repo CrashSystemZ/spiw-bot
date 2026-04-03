@@ -1,0 +1,16 @@
+services:
+  spiw-bot:
+    image: spiw-bot:latest
+    container_name: spiw-bot
+    environment:
+      SPIW_BOT_TOKEN: "${SPIW_BOT_TOKEN}"
+      SPIW_SERVICE_CHAT_ID: "${SPIW_SERVICE_CHAT_ID}"
+    volumes:
+      - ./data:/app/data
+    tmpfs:
+      - /tmp/spiw-media:size=2G,uid=10001,gid=10001
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    user: "10001:10001"
+    restart: unless-stopped
