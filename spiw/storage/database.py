@@ -43,4 +43,12 @@ async def init_database(db_path: Path) -> aiosqlite.Connection:
     """)
 
     await db.commit()
+
+    for col, col_type in [("audio_file_id", "TEXT"), ("audio_duration", "REAL")]:
+        try:
+            await db.execute(f"ALTER TABLE media_cache ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+    await db.commit()
+
     return db

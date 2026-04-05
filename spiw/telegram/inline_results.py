@@ -51,6 +51,7 @@ def build_post_keyboard(
     carousel_token: str | None = None,
     current_index: int = 0,
     total_items: int = 0,
+    has_audio: bool = False,
 ) -> InlineKeyboardMarkup | None:
     rows: list[list[InlineKeyboardButton]] = []
 
@@ -60,7 +61,7 @@ def build_post_keyboard(
     if like_count is not None:
         main_row.append(InlineKeyboardButton(
             text=f"\u2764\uFE0F {_format_count(like_count)}",
-            callback_data="noop:like",
+            callback_data="like",
         ))
 
                                   
@@ -77,7 +78,7 @@ def build_post_keyboard(
     if main_row:
         rows.append(main_row)
 
-                                       
+
     if carousel_token and total_items > 1:
         prev_index = (current_index - 1) % total_items
         next_index = (current_index + 1) % total_items
@@ -87,6 +88,46 @@ def build_post_keyboard(
             InlineKeyboardButton(text="\u27A1\uFE0F", callback_data=f"car:{carousel_token}:{next_index}"),
         ]
         rows.insert(0, nav_row)
+
+        if has_audio:
+            audio_row = [InlineKeyboardButton(
+                text="\U0001F3B5",
+                callback_data=f"aud:{carousel_token}:{current_index}",
+            )]
+            rows.insert(1, audio_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
+
+
+def build_audio_mode_keyboard(
+    source_url: str | None = None,
+    like_count: int | None = None,
+    carousel_token: str | None = None,
+    photo_index: int = 0,
+) -> InlineKeyboardMarkup | None:
+    rows: list[list[InlineKeyboardButton]] = []
+
+    photo_row = [InlineKeyboardButton(
+        text="\U0001F5BC\uFE0F",
+        callback_data=f"pho:{carousel_token}:{photo_index}",
+    )]
+    rows.append(photo_row)
+
+    main_row: list[InlineKeyboardButton] = []
+    if like_count is not None:
+        main_row.append(InlineKeyboardButton(
+            text=f"\u2764\uFE0F {_format_count(like_count)}",
+            callback_data="like",
+        ))
+    if source_url:
+        main_row.append(InlineKeyboardButton(text="\U0001F4CE", url=source_url))
+    if source_url:
+        main_row.append(InlineKeyboardButton(
+            text="\U0001F4E4",
+            switch_inline_query=source_url,
+        ))
+    if main_row:
+        rows.append(main_row)
 
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
@@ -175,6 +216,7 @@ def make_carousel_cached_result(media: CachedMedia, carousel_token: str) -> list
         carousel_token=carousel_token,
         current_index=0,
         total_items=len(media.items),
+        has_audio=bool(media.audio_file_id),
     )
     result_id = _short_hash(f"carousel:{media.cache_key}:{carousel_token}")
 

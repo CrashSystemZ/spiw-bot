@@ -84,6 +84,8 @@ class PreparedAsset:
     source_url: str | None = None
     like_count: int | None = None
     comment_count: int | None = None
+    audio_path: Path | None = None
+    audio_duration: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +109,8 @@ class CachedMedia:
     source_url: str | None = None
     like_count: int | None = None
     comment_count: int | None = None
+    audio_file_id: str | None = None
+    audio_duration: float | None = None
 
     def is_carousel(self) -> bool:
         return len(self.items) > 1

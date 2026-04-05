@@ -11,6 +11,7 @@ from aiogram.types import (
     InlineQueryResultArticle,
     InlineQueryResultPhoto,
     InputMediaAnimation,
+    InputMediaAudio,
     InputMediaPhoto,
     InputMediaVideo,
     InputTextMessageContent,
@@ -25,6 +26,7 @@ from spiw.models.media import CachedMedia, CachedMediaItem, ResolvedAsset
 from spiw.storage.media_cache import MediaCacheRepository
 from spiw.storage.memory import InMemoryState
 from spiw.telegram.inline_results import (
+    build_audio_mode_keyboard,
     build_post_keyboard,
     format_caption,
     make_cached_result,
@@ -264,8 +266,8 @@ async def _wait_for_cache(deps: HandlerDeps, validated, timeout: float = 60.0) -
         cached = await deps.media_cache.get(validated.cache_key)
         if cached:
             return cached
-        await asyncio.sleep(0.5)
-        elapsed += 0.5
+        await asyncio.sleep(0.25)
+        elapsed += 0.25
     return None
 
 
@@ -276,10 +278,16 @@ async def handle_callback_query(callback: CallbackQuery) -> None:
     deps = _d()
     data = callback.data or ""
 
-    if data.startswith("noop:"):
+    if data == "like":
+        await callback.answer("❤️")
+    elif data.startswith("noop:"):
         await callback.answer()
     elif data.startswith("car:"):
         await _handle_carousel(deps, callback, data)
+    elif data.startswith("aud:"):
+        await _handle_audio_toggle(deps, callback, data)
+    elif data.startswith("pho:"):
+        await _handle_photo_toggle(deps, callback, data)
     elif data.startswith("retry:"):
         await _handle_retry(deps, callback, data)
     else:
@@ -324,6 +332,7 @@ async def _handle_carousel(deps: HandlerDeps, callback: CallbackQuery, data: str
     keyboard = build_post_keyboard(
         source_url=carousel.source_url, like_count=carousel.like_count,
         carousel_token=token, current_index=index, total_items=len(carousel.items),
+        has_audio=bool(carousel.audio_file_id),
     )
 
     try:
@@ -334,6 +343,112 @@ async def _handle_carousel(deps: HandlerDeps, callback: CallbackQuery, data: str
         await callback.answer()
     except Exception as exc:
         logger.warning("Carousel edit failed: %s", exc)
+        await callback.answer(messages.TRY_AGAIN)
+
+
+async def _handle_audio_toggle(deps: HandlerDeps, callback: CallbackQuery, data: str) -> None:
+    parts = data.split(":")
+    if len(parts) != 3:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    token = parts[1]
+    try:
+        photo_index = int(parts[2])
+    except ValueError:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    carousel = deps.state.carousel_sessions.get(token)
+    if carousel is None:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    if not carousel.audio_file_id:
+        await callback.answer()
+        return
+
+    dummy = CachedMedia(
+        cache_key=carousel.cache_key, platform=carousel.platform,
+        title=carousel.title, description=carousel.description,
+        source_url=carousel.source_url, like_count=carousel.like_count,
+        comment_count=carousel.comment_count,
+    )
+    caption = format_caption(dummy)
+    media = InputMediaAudio(
+        media=carousel.audio_file_id,
+        caption=caption,
+        parse_mode="MarkdownV2" if caption else None,
+        duration=int(carousel.audio_duration) if carousel.audio_duration else None,
+    )
+    keyboard = build_audio_mode_keyboard(
+        source_url=carousel.source_url,
+        like_count=carousel.like_count,
+        carousel_token=token,
+        photo_index=photo_index,
+    )
+
+    try:
+        if callback.inline_message_id:
+            await deps.bot.edit_message_media(
+                media=media, inline_message_id=callback.inline_message_id,
+                reply_markup=keyboard,
+            )
+        await callback.answer()
+    except Exception as exc:
+        logger.warning("Audio toggle failed: %s", exc)
+        await callback.answer(messages.TRY_AGAIN)
+
+
+async def _handle_photo_toggle(deps: HandlerDeps, callback: CallbackQuery, data: str) -> None:
+    parts = data.split(":")
+    if len(parts) != 3:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    token = parts[1]
+    try:
+        index = int(parts[2])
+    except ValueError:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    carousel = deps.state.carousel_sessions.get(token)
+    if carousel is None:
+        await callback.answer(messages.CAROUSEL_EXPIRED)
+        return
+
+    if index < 0 or index >= len(carousel.items):
+        index = 0
+
+    item_data = carousel.items[index]
+    item = CachedMediaItem(
+        kind=MediaKind(item_data["kind"]), file_id=item_data["file_id"],
+        width=item_data.get("width"), height=item_data.get("height"),
+        duration=item_data.get("duration"), spoiler=item_data.get("spoiler", False),
+    )
+    dummy = CachedMedia(
+        cache_key=carousel.cache_key, platform=carousel.platform,
+        title=carousel.title, description=carousel.description,
+        source_url=carousel.source_url, like_count=carousel.like_count,
+        comment_count=carousel.comment_count,
+    )
+    media = _make_input_media(item, dummy)
+    keyboard = build_post_keyboard(
+        source_url=carousel.source_url, like_count=carousel.like_count,
+        carousel_token=token, current_index=index, total_items=len(carousel.items),
+        has_audio=bool(carousel.audio_file_id),
+    )
+
+    try:
+        if callback.inline_message_id:
+            await deps.bot.edit_message_media(
+                media=media, inline_message_id=callback.inline_message_id,
+                reply_markup=keyboard,
+            )
+        await callback.answer()
+    except Exception as exc:
+        logger.warning("Photo toggle failed: %s", exc)
         await callback.answer(messages.TRY_AGAIN)
 
 
@@ -393,6 +508,8 @@ def _save_carousel_state(deps: HandlerDeps, token: str, cached: CachedMedia) -> 
         title=cached.title, description=cached.description,
         source_url=cached.source_url, like_count=cached.like_count,
         comment_count=cached.comment_count,
+        audio_file_id=cached.audio_file_id,
+        audio_duration=cached.audio_duration,
     )
 
 
@@ -405,6 +522,7 @@ async def _edit_with_carousel(
     keyboard = build_post_keyboard(
         source_url=cached.source_url, like_count=cached.like_count,
         carousel_token=carousel_token, current_index=index, total_items=len(cached.items),
+        has_audio=bool(cached.audio_file_id),
     )
     await deps.bot.edit_message_media(
         media=media, inline_message_id=inline_message_id, reply_markup=keyboard,

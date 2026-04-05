@@ -141,7 +141,7 @@ class XPostProvider(YtDlpProviderBase):
                 continue
             bitrate = self._as_int(variant.get("bitrate")) or self._as_int(variant.get("bit_rate")) or 0
             width = self._as_int(variant.get("width")) or self._as_int(item.get("width")) or 0
-            candidates.append(((0 if bitrate and bitrate <= 2_500_000 else 1, -bitrate, -width), variant_url))
+            candidates.append(((0 if bitrate and bitrate <= 8_000_000 else 1, -bitrate, -width), variant_url))
 
         if candidates:
             candidates.sort(key=lambda e: e[0])

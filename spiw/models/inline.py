@@ -31,3 +31,5 @@ class CarouselState:
     source_url: str | None = None
     like_count: int | None = None
     comment_count: int | None = None
+    audio_file_id: str | None = None
+    audio_duration: float | None = None

@@ -33,8 +33,9 @@ class MediaCacheRepository:
         await self._db.execute(
             """INSERT OR REPLACE INTO media_cache
                (cache_key, platform, items_json, title, description,
-                thumbnail_url, source_url, like_count, comment_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                thumbnail_url, source_url, like_count, comment_count,
+                audio_file_id, audio_duration)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 media.cache_key,
                 media.platform.value,
@@ -45,6 +46,8 @@ class MediaCacheRepository:
                 media.source_url,
                 media.like_count,
                 media.comment_count,
+                media.audio_file_id,
+                media.audio_duration,
             ),
         )
         await self._db.commit()
@@ -74,6 +77,8 @@ class MediaCacheRepository:
             source_url=row["source_url"],
             like_count=row["like_count"],
             comment_count=row["comment_count"],
+            audio_file_id=row["audio_file_id"],
+            audio_duration=row["audio_duration"],
         )
 
     @staticmethod

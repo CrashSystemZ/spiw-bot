@@ -42,8 +42,19 @@ class MediaPipeline:
                 for index, path in enumerate(media_files, start=1)
             ]
 
+        audio_path = None
+        audio_duration = None
+        if asset.audio_track and not asset.renders_as_video():
+            try:
+                audio_path = self._discover_audio_file(workdir)
+                probe = await self._safe_probe(audio_path)
+                fmt = probe.get("format", {})
+                audio_duration = _as_float(fmt.get("duration")) or asset.audio_track.duration
+            except MediaUnavailableError:
+                audio_path = None
+
         return PreparedAsset(
-            cache_key="",                             
+            cache_key="",
             platform=asset.platform,
             workdir=workdir,
             items=prepared_items,
@@ -53,6 +64,8 @@ class MediaPipeline:
             source_url=asset.source_url,
             like_count=asset.like_count,
             comment_count=asset.comment_count,
+            audio_path=audio_path,
+            audio_duration=audio_duration,
         )
 
     async def cleanup(self, workdir: Path | None) -> None:

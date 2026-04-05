@@ -12,7 +12,7 @@ class InMemoryState:
     def __init__(self) -> None:
         self.provider_cache: TTLCache = TTLCache(maxsize=1000, ttl=3600)
         self.inline_sessions: dict[str, InlineSession] = {}
-        self.carousel_sessions: TTLCache[str, CarouselState] = TTLCache(maxsize=500, ttl=172800)
+        self.carousel_sessions: TTLCache[str, CarouselState] = TTLCache(maxsize=500, ttl=259200)
         self.warmup_debounce: TTLCache[str, bool] = TTLCache(maxsize=1000, ttl=30)
         self.retry_state: TTLCache[str, dict] = TTLCache(maxsize=500, ttl=300)
         self._locks: dict[str, asyncio.Lock] = {}

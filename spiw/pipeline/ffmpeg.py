@@ -36,7 +36,7 @@ class FFmpegToolkit:
         target = path.with_suffix(".jpg")
         await self._run(
             self._ffmpeg, "-y", "-i", str(path),
-            "-frames:v", "1",
+            "-frames:v", "1", "-q:v", "2",
             str(target),
         )
         return target
