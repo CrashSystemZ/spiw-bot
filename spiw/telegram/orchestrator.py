@@ -55,12 +55,27 @@ class MediaOrchestrator:
                 asset = await provider.resolve(validated.normalized_url, validated.media_id)
                 self._state.provider_cache[validated.cache_key] = asset
 
-                                  
+            if asset.is_text_only():
+                cached_media = CachedMedia(
+                    cache_key=validated.cache_key,
+                    platform=asset.platform,
+                    items=[],
+                    title=asset.title,
+                    description=asset.description,
+                    thumbnail_url=asset.thumbnail_url,
+                    source_url=asset.source_url,
+                    like_count=asset.like_count,
+                    comment_count=asset.comment_count,
+                )
+                await self._cache.put(cached_media)
+                return cached_media
+
+
             duration = asset.effective_duration()
             if duration and duration > self._settings.max_video_duration_seconds:
                 raise DurationLimitError(self._settings.max_video_duration_seconds)
 
-                                               
+
             async with self._state.processing_semaphore:
                 workdir = self._settings.media_temp_dir / validated.cache_key.replace(":", "_")[:16]
                 workdir.mkdir(parents=True, exist_ok=True)

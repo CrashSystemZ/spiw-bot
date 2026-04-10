@@ -33,11 +33,12 @@ from spiw.telegram.inline_results import (
     make_carousel_cached_result,
     make_error_result,
     make_loading_result,
+    make_text_only_result,
 )
 from spiw.telegram.orchestrator import MediaOrchestrator
 from spiw.utils import messages
 from spiw.utils.hashing import build_inline_query_aliases, make_carousel_token
-from spiw.telegram.inline_results import _short_hash
+from spiw.telegram.inline_results import _escape_md2, _short_hash
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +115,23 @@ async def handle_inline_query(query: InlineQuery) -> None:
     except (TimeoutError, Exception):
         pass
 
-                                                     
     source_url = validated.normalized_url
     keyboard = build_post_keyboard(source_url=source_url,
                                    like_count=resolved.like_count if resolved else None)
+
+    if resolved and resolved.is_text_only():
+        dummy = CachedMedia(
+            cache_key=validated.cache_key, platform=resolved.platform,
+            title=resolved.title, description=resolved.description,
+            thumbnail_url=resolved.thumbnail_url, source_url=resolved.source_url,
+            like_count=resolved.like_count, comment_count=resolved.comment_count,
+        )
+        results = make_text_only_result(dummy)
+        await query.answer(results=results, cache_time=1, is_personal=True)
+        if validated.cache_key not in deps.state.warmup_debounce:
+            deps.state.warmup_debounce[validated.cache_key] = True
+            asyncio.create_task(_warmup_media(deps, validated, raw_query))
+        return
 
     is_simple_photo = (
         resolved
@@ -231,8 +245,15 @@ async def _complete_inline(
             aliases = build_inline_query_aliases(raw_query, validated.original_url, validated.normalized_url)
             await deps.media_cache.put_aliases(aliases, validated.cache_key)
 
-              
-        if cached.is_carousel():
+        if cached.is_text_only():
+            caption = format_caption(cached)
+            text = caption or _escape_md2(cached.description or cached.title or "Text post")
+            keyboard = build_post_keyboard(source_url=cached.source_url, like_count=cached.like_count)
+            await deps.bot.edit_message_text(
+                text=text, inline_message_id=inline_message_id,
+                parse_mode="MarkdownV2", reply_markup=keyboard,
+            )
+        elif cached.is_carousel():
             token = make_carousel_token(validated.cache_key)
             _save_carousel_state(deps, token, cached)
             await _edit_with_carousel(deps, inline_message_id, cached, token, 0)
@@ -480,12 +501,21 @@ async def _handle_retry(deps: HandlerDeps, callback: CallbackQuery, data: str) -
         aliases = build_inline_query_aliases(raw_query, validated.original_url, validated.normalized_url)
         await deps.media_cache.put_aliases(aliases, validated.cache_key)
 
-        item = cached.items[0]
-        media = _make_input_media(item, cached)
-        keyboard = build_post_keyboard(source_url=cached.source_url, like_count=cached.like_count)
-        await deps.bot.edit_message_media(
-            media=media, inline_message_id=inline_message_id, reply_markup=keyboard,
-        )
+        if cached.is_text_only():
+            caption = format_caption(cached)
+            text = caption or _escape_md2(cached.description or cached.title or "Text post")
+            keyboard = build_post_keyboard(source_url=cached.source_url, like_count=cached.like_count)
+            await deps.bot.edit_message_text(
+                text=text, inline_message_id=inline_message_id,
+                parse_mode="MarkdownV2", reply_markup=keyboard,
+            )
+        else:
+            item = cached.items[0]
+            media = _make_input_media(item, cached)
+            keyboard = build_post_keyboard(source_url=cached.source_url, like_count=cached.like_count)
+            await deps.bot.edit_message_media(
+                media=media, inline_message_id=inline_message_id, reply_markup=keyboard,
+            )
     except BotError as e:
         try:
             await deps.bot.edit_message_text(text=f"\u274C {e.message}", inline_message_id=inline_message_id)

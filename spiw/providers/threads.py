@@ -106,11 +106,20 @@ class ThreadsPostProvider:
             return False
         if not isinstance(node.get("text_post_app_info"), dict):
             return False
-        return (
+        has_media = (
             isinstance(node.get("image_versions2"), dict)
             or isinstance(node.get("video_versions"), list)
             or isinstance(node.get("carousel_media"), list)
         )
+        if has_media:
+            return True
+        caption = node.get("caption")
+        if isinstance(caption, dict) and caption.get("text"):
+            return True
+        fragments = ((node.get("text_post_app_info") or {}).get("text_fragments") or {}).get("fragments")
+        if isinstance(fragments, list) and fragments:
+            return True
+        return False
 
     @staticmethod
     def _post_score(node: dict) -> int:
@@ -131,11 +140,12 @@ class ThreadsPostProvider:
 
     def _build_asset_from_post(self, url: str, post: dict) -> ResolvedAsset:
         items = self._resolve_items(post)
-        if not items:
-            raise MediaUnavailableError("The Threads post does not contain supported media")
-
         description = self._extract_caption(post)
         title = description[:96] if description is not None else None
+
+        if not items and not description:
+            raise MediaUnavailableError("The Threads post does not contain supported media")
+
         replies = self._as_int((post.get("text_post_app_info") or {}).get("direct_reply_count"))
 
         return ResolvedAsset(

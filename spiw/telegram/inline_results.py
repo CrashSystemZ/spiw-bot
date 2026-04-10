@@ -142,7 +142,34 @@ def _format_count(count: int) -> str:
 
                                                                                
 
+def make_text_only_result(media: CachedMedia) -> list:
+    caption = format_caption(media)
+    text = caption or _escape_md2(media.description or media.title or "Text post")
+    keyboard = build_post_keyboard(
+        source_url=media.source_url,
+        like_count=media.like_count,
+    )
+    title = media.title or "Text post"
+    description = media.description or ""
+    if len(description) > 100:
+        description = description[:100] + "..."
+
+    return [InlineQueryResultArticle(
+        id=f"text:{_short_hash(media.cache_key)}",
+        title=f"\U0001F4DD {title[:64]}",
+        description=description,
+        thumbnail_url=media.thumbnail_url,
+        input_message_content=InputTextMessageContent(
+            message_text=text,
+            parse_mode="MarkdownV2",
+        ),
+        reply_markup=keyboard,
+    )]
+
+
 def make_cached_result(media: CachedMedia) -> list:
+    if media.is_text_only():
+        return make_text_only_result(media)
     if media.is_carousel():
         return [_make_single_cached_result(media.items[0], media, result_id_suffix="0")]
     return [_make_single_cached_result(media.items[0], media)]

@@ -52,6 +52,9 @@ class ResolvedAsset:
             and bool(self.audio_track.source_url)
         )
 
+    def is_text_only(self) -> bool:
+        return not self.items and bool(self.title or self.description)
+
     def effective_duration(self) -> float | None:
         if self.renders_as_video() and self.audio_track:
             return self.audio_track.duration
@@ -114,3 +117,6 @@ class CachedMedia:
 
     def is_carousel(self) -> bool:
         return len(self.items) > 1
+
+    def is_text_only(self) -> bool:
+        return not self.items and bool(self.title or self.description)

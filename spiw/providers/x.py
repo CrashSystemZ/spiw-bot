@@ -25,9 +25,12 @@ class XPostProvider(YtDlpProviderBase):
     async def resolve(self, url: str, media_id: str) -> ResolvedAsset:
         try:
             return await self._resolve_via_fxtwitter(url, media_id)
-        except MediaUnavailableError:
-            asset = await super().resolve(url, media_id)
-            return self._enrich_caption(asset, media_id)
+        except MediaUnavailableError as fxe:
+            try:
+                asset = await super().resolve(url, media_id)
+                return self._enrich_caption(asset, media_id)
+            except MediaUnavailableError:
+                raise fxe from None
 
     async def _resolve_via_fxtwitter(self, url: str, media_id: str) -> ResolvedAsset:
         try:
@@ -50,10 +53,14 @@ class XPostProvider(YtDlpProviderBase):
 
     def _build_asset_from_tweet(self, url: str, tweet: dict) -> ResolvedAsset:
         items = self._collect_items_from_tweet(tweet)
-        if not items:
-            raise MediaUnavailableError("The X post does not contain supported media")
 
-        if len(items) > self._settings.max_media_group_items and not all(i.kind is MediaKind.PHOTO for i in items):
+        if not items:
+            title = self._pick_tweet_title(tweet)
+            description = self._pick_tweet_description(tweet)
+            if not title and not description:
+                raise MediaUnavailableError("The X post does not contain supported media")
+
+        if items and len(items) > self._settings.max_media_group_items and not all(i.kind is MediaKind.PHOTO for i in items):
             raise MediaUnavailableError(
                 f"The source returned more than {self._settings.max_media_group_items} items"
             )
