@@ -9,6 +9,12 @@
 
 **SPIW-bot** is a Telegram inline bot for resolving and delivering social media content as cached Telegram media. It validates links, fetches metadata, prepares and normalizes assets, caches results, and returns Telegram-ready inline items.
 
+<img width="128" height="77" alt="Screenshot 2026-04-13 at 16 03 39 1" src="https://github.com/user-attachments/assets/b36f1fb5-d011-4a18-bf18-32af47660e22" />
+
+<img width="285" height="124" alt="Screenshot 2026-04-13 at 16 04 30 1" src="https://github.com/user-attachments/assets/43d00511-cf86-45d5-9046-5f0df3c8d1fb" />
+
+<img width="128" height="185" alt="Screenshot 2026-04-13 at 16 05 38 1" src="https://github.com/user-attachments/assets/ebdc7b76-a062-4290-b485-71175d012d9d" />
+
 ## What it does
 
 - Supports Telegram inline queries with links from major platforms.
