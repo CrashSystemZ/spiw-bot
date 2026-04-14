@@ -34,13 +34,13 @@ class MediaPipeline:
             media_files = self._discover_media_files(workdir)
             if not media_files:
                 raise MediaUnavailableError("No media files found after download")
-            prepared_items = [
-                await self._prepare_file(
+            prepared_items = list(await asyncio.gather(*[
+                self._prepare_file(
                     index, path,
                     asset.items[index - 1] if index <= len(asset.items) else None,
                 )
                 for index, path in enumerate(media_files, start=1)
-            ]
+            ]))
 
         audio_path = None
         audio_duration = None
@@ -133,21 +133,37 @@ class MediaPipeline:
         if kind is MediaKind.VIDEO and path.suffix.lower() not in {".mp4", ".mov"}:
             normalized_path = await self._ffmpeg.remux_video(path)
 
-        metadata = await self._safe_probe(normalized_path)
-        video_stream = next(
-            (s for s in metadata.get("streams", []) if s.get("codec_type") == "video"), {}
-        )
+        width, height, duration = self._extract_known_metadata(resolved_item)
+        needs_probe = kind is not MediaKind.PHOTO and (width is None or height is None)
+        if needs_probe:
+            metadata = await self._safe_probe(normalized_path)
+            video_stream = next(
+                (s for s in metadata.get("streams", []) if s.get("codec_type") == "video"), {}
+            )
+            width = width or _as_int(video_stream.get("width"))
+            height = height or _as_int(video_stream.get("height"))
+            duration = duration or _as_float(
+                video_stream.get("duration") or metadata.get("format", {}).get("duration"),
+            )
 
         return PreparedMediaItem(
             kind=kind,
             position=position,
             path=normalized_path,
             size_bytes=normalized_path.stat().st_size if normalized_path.exists() else 0,
-            width=_as_int(video_stream.get("width")),
-            height=_as_int(video_stream.get("height")),
-            duration=_as_float(video_stream.get("duration") or metadata.get("format", {}).get("duration")),
+            width=width,
+            height=height,
+            duration=duration,
             spoiler=spoiler,
         )
+
+    @staticmethod
+    def _extract_known_metadata(
+        resolved_item: ResolvedMediaItem | None,
+    ) -> tuple[int | None, int | None, float | None]:
+        if resolved_item is None:
+            return None, None, None
+        return resolved_item.width, resolved_item.height, resolved_item.duration
 
     async def _safe_probe(self, path: Path) -> dict:
         try:

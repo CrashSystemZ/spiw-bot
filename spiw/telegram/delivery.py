@@ -29,6 +29,7 @@ _SUCCESS_COOLDOWN = 0.25
 _RATE_LIMIT_PADDING = 1.0
 _MAX_RETRIES = 5
 _MEDIA_GROUP_LIMIT = 10
+_UPLOAD_CONCURRENCY = 5
 
 
 class DeliveryService:
@@ -36,7 +37,7 @@ class DeliveryService:
     def __init__(self, bot: Bot, service_chat_id: int) -> None:
         self._bot = bot
         self._chat_id = service_chat_id
-        self._upload_lock = asyncio.Lock()
+        self._upload_semaphore = asyncio.Semaphore(_UPLOAD_CONCURRENCY)
         self._next_allowed_at: float = 0.0
 
     async def upload_and_cache(self, asset: PreparedAsset) -> CachedMedia:
@@ -47,9 +48,9 @@ class DeliveryService:
         if len(items) == 1:
             cached_items = [await self._upload_single(items[0])]
         elif has_animation or len(items) > _MEDIA_GROUP_LIMIT:
-            cached_items = []
-            for item in items:
-                cached_items.append(await self._upload_single(item))
+            cached_items = list(await asyncio.gather(*[
+                self._upload_single(item) for item in items
+            ]))
         else:
             cached_items = await self._upload_media_group(items)
 
@@ -153,7 +154,7 @@ class DeliveryService:
         return msg.audio.file_id
 
     async def _execute_with_retry(self, method_name: str, action):
-        async with self._upload_lock:
+        async with self._upload_semaphore:
             for attempt in range(_MAX_RETRIES):
                 await self._wait_cooldown()
                 try:
