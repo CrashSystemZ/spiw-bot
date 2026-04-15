@@ -1,2 +1,18 @@
-deploy.sh
-.idea
+.idea/
+.DS_Store
+
+# Node / TypeScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.session
+
+# Environment files
+.env

@@ -1,0 +1,13 @@
+export const messages = {
+    loading: "Cooking...",
+    carouselExpired: "Carousel expired 😴",
+    retryExpired: "Retry expired 🙈",
+    retryStarted: "Retrying request 🔄",
+    unsupportedLink: "Link not supported 😩",
+    mediaTooLarge: "This media is too large 👀",
+    mediaUnavailable: "Failed to get media 😵‍💫",
+    localProcessingUnsupported: "This media requires local processing and is not supported yet 🫠",
+    tryAgain: "Something went wrong, try again later 🧠",
+    clickToSend: "Click to send",
+    statsTitle: "Video delivery stats",
+} as const

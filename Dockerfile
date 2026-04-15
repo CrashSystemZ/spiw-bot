@@ -1,18 +1,24 @@
-FROM python:3.13-slim
+FROM node:22-bookworm-slim AS build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN useradd -r -u 10001 -m spiw
 WORKDIR /app
 
-COPY pyproject.toml .
-COPY spiw/ ./spiw/
-RUN pip install --no-cache-dir .
+COPY package.json package-lock.json tsconfig.json ./
+RUN npm ci
 
-RUN mkdir -p /app/data && chown spiw:spiw /app/data
+COPY src ./src
+RUN npm run build
 
-USER spiw
+RUN npm prune --omit=dev
 
-CMD ["python", "-m", "spiw"]
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+
+RUN mkdir -p /app/data
+
+CMD ["node", "dist/index.js"]
