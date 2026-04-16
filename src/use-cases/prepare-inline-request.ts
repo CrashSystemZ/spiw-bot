@@ -1,6 +1,7 @@
-import {messages} from "../core/messages.js"
+import {UnsupportedLinkError} from "../core/errors.js"
 import type {InlineRequestContext} from "../core/models.js"
 import {SpiwRuntime} from "../core/runtime.js"
+import {renderUserError} from "../telegram/user-errors.js"
 
 export type PrepareInlineRequestResult =
     | { kind: "empty" }
@@ -24,13 +25,11 @@ export async function prepareInlineRequest(
             request,
         }
     } catch (error) {
-        const message = error instanceof Error ? error.message : messages.tryAgain
-        if (message === messages.unsupportedLink || message.includes("Link not supported")) {
+        if (error instanceof UnsupportedLinkError)
             return {kind: "unsupported"}
-        }
         return {
             kind: "error",
-            message,
+            message: renderUserError(error),
         }
     }
 }

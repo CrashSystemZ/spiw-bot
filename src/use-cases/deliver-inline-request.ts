@@ -1,4 +1,4 @@
-import {messages} from "../core/messages.js"
+import {MediaUnavailableError} from "../core/errors.js"
 import type {PendingRequestRecord, ResolvedMetadata, SessionEntry} from "../core/models.js"
 import {isCaptionAvailable, shouldShowCaptionByDefault} from "../core/caption-policy.js"
 import {SpiwRuntime} from "../core/runtime.js"
@@ -20,7 +20,7 @@ export async function deliverInlineRequest(
 ): Promise<DeliveredInlineRequest> {
     const delivered = await runtime.hydrateSessionForRequest(requestId)
     if (!delivered.session.items.length)
-        throw new Error(messages.mediaUnavailable)
+        throw new MediaUnavailableError("not_found")
 
     return {
         ...delivered,

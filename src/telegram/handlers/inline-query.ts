@@ -1,6 +1,7 @@
 import { logError, logInfo } from "../../core/log.js"
 import { SpiwRuntime } from "../../core/runtime.js"
 import { presentErrorInlineResult, presentLoadingInlineResult } from "../presenter.js"
+import { renderUserError } from "../user-errors.js"
 import { prepareInlineRequest } from "../../use-cases/prepare-inline-request.js"
 
 export function registerInlineQueryHandler(dp: any, runtime: SpiwRuntime) {
@@ -16,7 +17,7 @@ export function registerInlineQueryHandler(dp: any, runtime: SpiwRuntime) {
                 userId: query.user?.id ?? null,
                 rawQuery,
             })
-            return { kind: "error", message: error instanceof Error ? error.message : "Something went wrong" } as const
+            return { kind: "error", message: renderUserError(error) } as const
         })
 
         switch (result.kind) {

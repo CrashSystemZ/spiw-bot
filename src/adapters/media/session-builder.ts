@@ -1,13 +1,18 @@
 import pLimit from "p-limit"
 
 import { env } from "../../config/env.js"
-import { CobaltClient, inferMediaKind, mapCobaltError } from "../../core/cobalt.js"
+import { CobaltClient, cobaltErrorToDomain, inferMediaKind } from "../../core/cobalt.js"
+import { MediaUnavailableError } from "../../core/errors.js"
 import { logDebug, logInfo } from "../../core/log.js"
 import { analyzeMediaBuffer } from "../../core/media-info.js"
 import type { ResolvedMetadata, SessionAudioTrack, SessionEntry, SessionMediaItem } from "../../core/models.js"
 
 export class MediaSessionBuilder {
-    readonly #cobalt = new CobaltClient()
+    readonly #cobalt: CobaltClient
+
+    constructor(cobalt: CobaltClient, private readonly rehydrateTtlMs: number) {
+        this.#cobalt = cobalt
+    }
 
     async build(metadata: ResolvedMetadata): Promise<SessionEntry> {
         const response = await this.#cobalt.resolve({
@@ -22,10 +27,10 @@ export class MediaSessionBuilder {
         })
 
         if (response.status === "error")
-            throw new Error(mapCobaltError(response.error.code))
+            throw cobaltErrorToDomain(response.error.code)
 
         if (response.status === "local-processing")
-            throw new Error("This media requires local processing and is not supported yet 🫠")
+            throw new MediaUnavailableError("local_processing")
 
         if (response.status === "picker") {
             const limit = pLimit(env.MAX_FETCHES_PER_JOB)
@@ -82,7 +87,7 @@ export class MediaSessionBuilder {
                 items: items.map(stripItemSize),
                 audio,
                 createdAt: Date.now(),
-                expiresAt: Date.now() + (3 * 24 * 60 * 60 * 1000),
+                expiresAt: Date.now() + this.rehydrateTtlMs,
                 sizeBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0) + (audio?.buffer.byteLength ?? 0),
             }
         }
@@ -115,7 +120,7 @@ export class MediaSessionBuilder {
             items: [item],
             audio: null,
             createdAt: Date.now(),
-            expiresAt: Date.now() + (3 * 24 * 60 * 60 * 1000),
+            expiresAt: Date.now() + this.rehydrateTtlMs,
             sizeBytes: downloaded.sizeBytes,
         }
     }

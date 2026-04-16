@@ -38,4 +38,5 @@ services:
       - /tmp:size=256m
     security_opt:
       - no-new-privileges:true
+    stop_grace_period: 15s
     restart: unless-stopped

@@ -1,9 +1,10 @@
+import { InternalInvariantError } from "../../core/errors.js"
 import { logError, logInfo, logWarn } from "../../core/log.js"
 import { SpiwRuntime } from "../../core/runtime.js"
-import { messages } from "../../core/messages.js"
 import { deliverInlineRequest } from "../../use-cases/deliver-inline-request.js"
 import { registerUiToken } from "../../use-cases/ui-token.js"
 import { countReplyMarkupRows, presentMediaMessage, summarizeItem } from "../presenter.js"
+import { renderUserError } from "../user-errors.js"
 
 export function registerChosenInlineHandler(dp: any, runtime: SpiwRuntime) {
     dp.onChosenInlineResult(async (result: any) => {
@@ -36,7 +37,7 @@ export function registerChosenInlineHandler(dp: any, runtime: SpiwRuntime) {
                 metadata: delivered.initialMessage.metadata,
             })
             if (!rendered)
-                throw new Error(messages.mediaUnavailable)
+                throw new InternalInvariantError("presentMediaMessage returned null after hydration")
 
             logInfo("bot.chosen_inline.edit_media", {
                 requestId: delivered.request.id,
@@ -59,7 +60,7 @@ export function registerChosenInlineHandler(dp: any, runtime: SpiwRuntime) {
                 resultId,
                 query: result.query ?? null,
             })
-            const message = error instanceof Error ? error.message : messages.tryAgain
+            const message = renderUserError(error)
             try {
                 await result.editMessage({
                     text: message,

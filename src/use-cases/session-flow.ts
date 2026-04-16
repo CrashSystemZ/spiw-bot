@@ -1,5 +1,6 @@
 import {type LimitFunction} from "p-limit"
 
+import {MediaUnavailableError} from "../core/errors.js"
 import type {PendingRequestRecord, ResolvedMetadata, SessionEntry} from "../core/models.js"
 import {isExpired} from "../core/time.js"
 import {logDebug, logInfo} from "../core/log.js"
@@ -35,13 +36,13 @@ export class SessionFlow {
         logInfo("runtime.session.hydrate_for_request.start", {requestId})
         const request = this.requests.get(requestId)
         if (!request)
-            throw new Error("Failed to get media 😵‍💫")
+            throw new MediaUnavailableError("not_found")
         if (isExpired(request.createdAt, this.requestTtlSeconds))
-            throw new Error("Failed to get media 😵‍💫")
+            throw new MediaUnavailableError("expired")
 
         const metadata = await this.#getRehydrateByCacheKey(request.cacheKey)
         if (!metadata)
-            throw new Error("Failed to get media 😵‍💫")
+            throw new MediaUnavailableError("not_found")
 
         const session = await this.ensureSession(metadata)
         await this.details.applyPrettyMetadata(session)
@@ -59,7 +60,7 @@ export class SessionFlow {
         logInfo("runtime.session.hydrate_from_cache_key.start", {cacheKey})
         const metadata = await this.#getRehydrateByCacheKey(cacheKey)
         if (!metadata)
-            throw new Error("Failed to get media 😵‍💫")
+            throw new MediaUnavailableError("not_found")
 
         const session = await this.ensureSession(metadata)
         await this.details.applyPrettyMetadata(session)

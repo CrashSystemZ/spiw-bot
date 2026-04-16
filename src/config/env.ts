@@ -11,6 +11,17 @@ const envSchema = z.object({
     SESSION_PATH: z.string().default("data/mtcute.session"),
     COBALT_BASE_URL: z.string().url(),
     COBALT_AUTHORIZATION: z.string().optional(),
+    COBALT_EXTRA_ENDPOINTS: z.string().default("").transform(s =>
+        s.split(",").map(u => u.trim()).filter(Boolean),
+    ),
+    COBALT_DISCOVERY_ENABLED: z.coerce.boolean().default(true),
+    COBALT_DISCOVERY_URL: z.string().url().default("https://cobalt.directory/api/working?type=api"),
+    COBALT_DISCOVERY_SERVICES: z.string().default("tiktok,instagram").transform(s =>
+        s.split(",").map(x => x.trim()).filter(Boolean),
+    ),
+    COBALT_DISCOVERY_MAX: z.coerce.number().int().positive().default(5),
+    COBALT_DISCOVERY_REFRESH_MS: z.coerce.number().int().positive().default(60 * 60 * 1000),
+    COBALT_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     INLINE_RESOLVE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
     REQUEST_TTL_SECONDS: z.coerce.number().int().positive().default(5400),

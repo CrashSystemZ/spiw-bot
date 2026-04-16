@@ -1,5 +1,6 @@
 import {randomUUID} from "node:crypto"
 
+import {UnsupportedLinkError} from "../core/errors.js"
 import {logInfo, logWarn} from "../core/log.js"
 import type {InlineRequestContext, PendingRequestRecord} from "../core/models.js"
 import {tryParseUrl} from "../core/url.js"
@@ -26,7 +27,9 @@ export class RequestFlow {
         })
         const parsedUrl = tryParseUrl(rawQuery)
         if (!parsedUrl)
-            throw new Error("Link not supported 😩")
+            throw new UnsupportedLinkError()
+        if (!this.metadata.isSupportedPlatform(parsedUrl))
+            throw new UnsupportedLinkError()
 
         const metadata = await this.#loadMetadata(rawQuery, parsedUrl)
         const request: PendingRequestRecord = {

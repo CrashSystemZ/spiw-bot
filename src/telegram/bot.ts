@@ -13,16 +13,20 @@ import { registerStatsHandler } from "./handlers/stats.js"
 
 type BotState = Record<string, never>
 
-export async function startBot() {
+export type BotHandle = {
+    stop: () => Promise<void>
+}
+
+export async function startBot(): Promise<BotHandle> {
     logInfo("bot.starting", {
         dbPath: env.DB_PATH,
         sessionPath: env.SESSION_PATH,
         cobaltBaseUrl: env.COBALT_BASE_URL,
     })
 
-    const db = new DatabaseClient(env.DB_PATH)
+    const db = DatabaseClient.create(env.DB_PATH)
     const runtime = new SpiwRuntime(db)
-    await runtime.init()
+    runtime.start()
 
     const bot = new TelegramClient({
         apiId: env.TG_API_ID,
@@ -44,4 +48,14 @@ export async function startBot() {
     logInfo("bot.started", {
         cobaltBaseUrl: env.COBALT_BASE_URL,
     })
+
+    return {
+        stop: async () => {
+            logInfo("bot.stopping")
+            await dp.destroy()
+            await bot.destroy()
+            await runtime.dispose()
+            logInfo("bot.stopped")
+        },
+    }
 }

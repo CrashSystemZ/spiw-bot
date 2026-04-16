@@ -1,3 +1,4 @@
+import { InternalInvariantError } from "../../../core/errors.js"
 import { logError, logInfo } from "../../../core/log.js"
 import { messages } from "../../../core/messages.js"
 import { SpiwRuntime } from "../../../core/runtime.js"
@@ -5,6 +6,7 @@ import { retryButton } from "../../ui.js"
 import { retryInlineDelivery } from "../../../use-cases/deliver-inline-request.js"
 import { registerUiToken } from "../../../use-cases/ui-token.js"
 import { presentMediaMessage, presentRetryMarkup } from "../../presenter.js"
+import { renderUserError } from "../../user-errors.js"
 
 export function registerRetryCallbackHandler(dp: any, runtime: SpiwRuntime) {
     dp.onAnyCallbackQuery(retryButton.filter(), async (query: any) => {
@@ -33,13 +35,13 @@ export function registerRetryCallbackHandler(dp: any, runtime: SpiwRuntime) {
                 metadata: initialMessage.metadata,
             })
             if (!rendered)
-                throw new Error(messages.mediaUnavailable)
+                throw new InternalInvariantError("presentMediaMessage returned null on retry")
             await query.editMessage(rendered)
         } catch (error) {
             logError("bot.callback.retry.failed", error, {
                 cacheKey: state.cacheKey,
             })
-            const message = error instanceof Error ? error.message : messages.tryAgain
+            const message = renderUserError(error)
             const retryToken = await registerUiToken(runtime, state.cacheKey, {
                 captionVisible: false,
                 mode: "media",

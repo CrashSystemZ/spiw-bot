@@ -29,6 +29,21 @@ export function createMetadataResolvers(): MetadataResolvers {
     ]
 }
 
+export function isUrlSupportedByPlatformResolver(
+    rawUrl: string,
+    context: MetadataResolutionContext = defaultResolutionContext,
+): boolean {
+    let url: URL
+    try {
+        url = new URL(rawUrl)
+    } catch {
+        return false
+    }
+    return context.resolvers.some(
+        resolver => resolver.platform !== "generic" && resolver.canHandle(url),
+    )
+}
+
 export async function normalizeMetadataUrl(
     rawInput: string,
     options: MetadataResolveOptions = {},

@@ -1,6 +1,8 @@
 import pLimit from "p-limit"
 
 import {env} from "../config/env.js"
+import {CobaltClient} from "./cobalt.js"
+import {type CobaltEndpoint, CobaltPool} from "./cobalt-pool.js"
 import {logDebug, logInfo} from "./log.js"
 import {DatabaseClient} from "./db/client.js"
 import type {DeliveryStats, InlineRequestContext, ResolvedMetadata, SessionEntry, UiStateRecord} from "./models.js"
@@ -22,7 +24,8 @@ export class SpiwRuntime {
     readonly #details: DetailsFlow
     readonly #requestFlow: RequestFlow
     readonly #sessionFlow: SessionFlow
-    readonly #requestCleanupTimer: NodeJS.Timeout
+    readonly #cobaltPool: CobaltPool
+    #requestCleanupTimer: NodeJS.Timeout | null = null
     #dailyCleanupTimer: NodeJS.Timeout | null = null
 
     constructor(db: DatabaseClient) {
@@ -31,6 +34,8 @@ export class SpiwRuntime {
         const postCache = new PostCacheRepository(db)
         const sessionStore = new SessionStore(env.MEDIA_BUFFER_BUDGET_BYTES, env.REHYDRATE_TTL_SECONDS * 1000)
         const metadataGateway = new MetadataGateway()
+        this.#cobaltPool = buildCobaltPool()
+        const cobaltClient = new CobaltClient(this.#cobaltPool)
         this.#uiState = new UiStateRepository(db)
         this.#stats = new StatsRepository(db)
         this.#details = new DetailsFlow(
@@ -55,21 +60,34 @@ export class SpiwRuntime {
             this.#details,
             this.#stats,
             sessionStore,
-            new MediaSessionBuilder(),
+            new MediaSessionBuilder(cobaltClient, env.REHYDRATE_TTL_SECONDS * 1000),
             pLimit(env.MAX_CONCURRENT_JOBS),
             env.REQUEST_TTL_SECONDS,
             env.REHYDRATE_TTL_SECONDS,
         )
+    }
+
+    start() {
+        void this.#cobaltPool.start()
         this.#requestCleanupTimer = setInterval(() => {
             void this.cleanupRequests()
         }, 15 * 60 * 1000)
         this.#requestCleanupTimer.unref()
         this.#scheduleDailyCleanup()
+        logInfo("runtime.init")
     }
 
-    async init() {
-        await this.#db.init()
-        logInfo("runtime.init")
+    async dispose() {
+        this.#cobaltPool.dispose()
+        if (this.#requestCleanupTimer) {
+            clearInterval(this.#requestCleanupTimer)
+            this.#requestCleanupTimer = null
+        }
+        if (this.#dailyCleanupTimer) {
+            clearTimeout(this.#dailyCleanupTimer)
+            this.#dailyCleanupTimer = null
+        }
+        await this.#db.close()
     }
 
     async cleanupRequests() {
@@ -149,4 +167,33 @@ function msUntilNextLocalHour(targetHour: number) {
     if (next <= now)
         next.setDate(next.getDate() + 1)
     return next.getTime() - now.getTime()
+}
+
+function buildCobaltPool(): CobaltPool {
+    const staticEndpoints: CobaltEndpoint[] = [
+        {
+            name: "primary",
+            url: env.COBALT_BASE_URL,
+            ...(env.COBALT_AUTHORIZATION ? {authorization: env.COBALT_AUTHORIZATION} : {}),
+        },
+        ...env.COBALT_EXTRA_ENDPOINTS.map(url => ({name: hostFromUrl(url), url})),
+    ]
+    const discovery = env.COBALT_DISCOVERY_ENABLED
+        ? {
+            url: env.COBALT_DISCOVERY_URL,
+            services: env.COBALT_DISCOVERY_SERVICES,
+            max: env.COBALT_DISCOVERY_MAX,
+            refreshMs: env.COBALT_DISCOVERY_REFRESH_MS,
+            requestTimeoutMs: env.COBALT_REQUEST_TIMEOUT_MS,
+        }
+        : null
+    return new CobaltPool(staticEndpoints, discovery)
+}
+
+function hostFromUrl(rawUrl: string): string {
+    try {
+        return new URL(rawUrl).host
+    } catch {
+        return rawUrl
+    }
 }

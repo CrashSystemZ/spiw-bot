@@ -1,6 +1,7 @@
 import { makeCacheKey } from "../../core/hash.js"
 import type { Platform, PreviewKind, ResolvedMetadata } from "../../core/models.js"
 import {
+    isUrlSupportedByPlatformResolver,
     normalizeMetadataUrl,
     resolveMetadata,
 } from "../../core/metadata/index.js"
@@ -8,6 +9,10 @@ import type { NormalizedMetadataUrl } from "../../core/types/metadata.js"
 import type { ResolvedMetadata as RawResolvedMetadata } from "../../core/types/metadata.js"
 
 export class MetadataGateway {
+    isSupportedPlatform(url: string): boolean {
+        return isUrlSupportedByPlatformResolver(url)
+    }
+
     async prepareShell(rawInput: string, timeoutMs: number) {
         const normalized = await normalizeMetadataUrl(rawInput, {
             timeoutMs,

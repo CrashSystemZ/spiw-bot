@@ -34,6 +34,7 @@ const suppressedEvents = new Set<string>([
     "runtime.cleanup.five_day",
     "runtime.session.cobalt_response",
     "bot.token.registered",
+    "cobalt.resolve.request",
 ])
 
 export function logDebug(event: string, data?: Record<string, unknown>) {
@@ -159,12 +160,23 @@ const eventMessages: Record<string, (d: D) => string> = {
     "runtime.session.single_downloaded": (d) => `File analysed — ${stringValue(path(d, "analysis.kind"))}, ${durationValue(path(d, "analysis.duration"))}, ${dimensionValue(path(d, "analysis.width"), path(d, "analysis.height"))}, ${size(d.sizeBytes)}`,
     "runtime.session.picker_item_downloaded": (d) => `Carousel item analysed — #${numberOrDash(d.index)}, ${stringValue(path(d, "analysis.kind"))}, ${dimensionValue(path(d, "analysis.width"), path(d, "analysis.height"))}, ${size(d.sizeBytes)}`,
     "runtime.session.audio_downloaded": (d) => `Audio track downloaded — ${stringValue(d.mimeType)}, ${size(d.sizeBytes)}`,
-    "cobalt.resolve.request": (d) => `Sending resolve request to cobalt — quality: ${stringValue(d.videoQuality)}p, codec: ${stringValue(d.youtubeVideoCodec)}, audio: ${stringValue(d.audioFormat)}/${stringValue(d.audioBitrate)}kbps, proxy: ${boolWord(d.alwaysProxy)}`,
+    "cobalt.resolve.request": (d) => `Cobalt request → ${stringValue(d.endpoint)} (quality ${stringValue(d.videoQuality)}p, proxy ${boolWord(d.alwaysProxy)})`,
     "cobalt.resolve.response": cobaltResolveMessage,
-    "cobalt.resolve.retrying": (d) => `Retrying cobalt resolve after ${stringValue(d.errorCode)} (alwaysProxy was ${boolWord(d.attemptedAlwaysProxy)})`,
+    "cobalt.resolve.retrying": (d) => `Retrying cobalt ${stringValue(d.endpoint)} after ${stringValue(d.errorCode)} — attempt ${numberOrDash(d.attempt)}, next delay ${numberOrDash(d.nextDelayMs)}ms`,
+    "cobalt.resolve.network_error": (d) => `Cobalt network error on ${stringValue(d.endpoint)} — ${stringValue(d.error)}`,
+    "cobalt.resolve.bad_body": (d) => `Cobalt returned unparseable body from ${stringValue(d.endpoint)} (HTTP ${numberOrDash(d.httpStatus)})`,
+    "cobalt.pool.started": (d) => `Cobalt pool started — ${numberOrDash(d.staticCount)} static endpoint(s), discovery ${boolWord(d.discoveryEnabled)}`,
+    "cobalt.pool.refreshed": (d) => `Cobalt pool refreshed — ${numberOrDash(d.staticCount)} static + ${numberOrDash(d.dynamicCount)} dynamic endpoint(s)`,
+    "cobalt.pool.refresh_http_error": (d) => `Cobalt pool refresh HTTP error — status ${numberOrDash(d.status)}`,
+    "cobalt.pool.refresh_invalid_body": () => `Cobalt pool refresh returned invalid body`,
+    "cobalt.pool.refresh_failed": (d) => `Cobalt pool refresh failed — ${stringValue(d.error)}`,
+    "cobalt.pool.endpoint_failed": (d) => `Cobalt endpoint ${stringValue(d.endpoint)} failed — ${stringValue(d.errorCode)}, falling through (${numberOrDash(d.remainingEndpoints)} left)`,
     "cobalt.fetch_binary.start": () => `Downloading binary from cobalt tunnel`,
     "cobalt.fetch_binary.ok": (d) => `Binary downloaded — ${stringValue(d.mimeType)}, ${numberOrDash(d.sizeBytes)} bytes (${size(d.sizeBytes)})`,
     "cobalt.fetch_binary.http_error": (d) => `Binary download failed — status ${numberOrDash(d.status)} for ${stringValue(d.url)}`,
+    "cobalt.fetch_binary.empty": (d) => `Cobalt tunnel returned empty body (HTTP ${numberOrDash(d.httpStatus)}, mime ${stringValue(d.mimeType)})`,
+    "cobalt.fetch_binary.empty_retry": (d) => `Retrying empty binary download — attempt ${numberOrDash(d.attempt)}`,
+    "cobalt.pool.endpoint_banned": (d) => `Cobalt endpoint banned until next pool refresh: ${stringValue(d.host)} (${stringValue(d.reason)})`,
     "bot.chosen_inline.received": () => `Received chosen result`,
     "bot.chosen_inline.edit_media": (d) => `Editing inline message media — ${numberOrDash(d.itemCount)} item(s), ${mediaSummary(d.firstItem)}, ${audioWord(d.hasAudio)}, ${numberOrDash(d.replyMarkupRows)} reply markup row(s)`,
     "bot.chosen_inline.edit_media.ok": () => `Inline message updated successfully`,
@@ -185,19 +197,10 @@ function messageForEvent(event: string, data: Record<string, unknown>) {
 }
 
 function cobaltResolveMessage(data: Record<string, unknown>) {
-    const body = objectValue(data.body)
-    if (!body)
-        return `Cobalt responded with status ${numberOrDash(data.httpStatus)}`
-    const status = stringValue(body.status)
-    if (status === "error") {
-        const error = objectValue(body.error)
-        return `Cobalt resolve failed — ${stringValue(error?.code)}`
-    }
-    if (status === "picker") {
-        const picker = Array.isArray(body.picker) ? body.picker.length : 0
-        return `Cobalt responded with picker — ${picker} item(s), audio ${boolWord(Boolean(body.audio))}`
-    }
-    return `Cobalt responded with ${status}, filename: ${stringValue(body.filename)}`
+    const status = stringValue(data.status)
+    if (!status)
+        return `Cobalt responded with HTTP ${numberOrDash(data.httpStatus)}`
+    return `Cobalt responded with ${status} (HTTP ${numberOrDash(data.httpStatus)})`
 }
 
 function fallbackMessage(data: Record<string, unknown>) {
