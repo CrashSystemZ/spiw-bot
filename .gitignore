@@ -16,3 +16,11 @@ data/
 
 # Environment files
 .env
+
+# Deployment / local dev (host-specific, contain secrets or local paths)
+deploy.sh
+docker-compose.dev.yml
+Dockerfile.dev
+
+# Local-only agent docs (operator guide, never published)
+AGENTS.md
