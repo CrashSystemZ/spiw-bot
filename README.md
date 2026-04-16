@@ -146,8 +146,6 @@ The bot reads env via Zod; unset optional vars get sane defaults.
 | `MEDIA_BUFFER_BUDGET_BYTES` | | `2 GB` | LRU session cache size |
 | `MAX_CONCURRENT_JOBS` | | `32` | Parallel session builds |
 
-Full list in [`AGENTS.md`](AGENTS.md#10-env-reference).
-
 All user-facing strings live in
 [`resources/messages.json`](resources/messages.json) — edit them without
 rebuilding.
@@ -165,9 +163,7 @@ src/
 ```
 
 **Layered, dependency-injected, testable.** `SpiwRuntime` is the DI
-root; nothing reads globals except the validated `env` object. See
-[`AGENTS.md`](AGENTS.md) for the full operator guide.
-
+root; nothing reads globals except the validated `env` object.
 ## Tech stack
 
 <p>
@@ -202,8 +198,6 @@ root; nothing reads globals except the validated `env` object. See
 - **Files > 2 GB won't be sent.** Hard cap to protect RAM. Telegram
   itself also has upload limits (50 MB via Bot API; we use user-client,
   so higher, but not infinite).
-- **No test suite.** Type-checks pass, verification is manual via real
-  inline queries. See [`AGENTS.md §16`](AGENTS.md#16-testing).
 
 ## License
 
