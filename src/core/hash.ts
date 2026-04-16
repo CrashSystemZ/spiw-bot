@@ -4,10 +4,6 @@ export function sha256(text: string) {
     return createHash("sha256").update(text).digest("hex")
 }
 
-export function md5(text: string) {
-    return createHash("md5").update(text).digest("hex")
-}
-
 export function makeCacheKey(source: string) {
     return sha256(source)
 }

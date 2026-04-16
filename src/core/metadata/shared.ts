@@ -156,10 +156,6 @@ export function ensureHttps(candidate: string): string {
     return candidate.startsWith("http://") ? `https://${candidate.slice("http://".length)}` : candidate;
 }
 
-export function escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 export function pickFirstHttpUrl(...values: Array<unknown>): string | undefined {
     for (const value of values) {
         if (typeof value === "string" && /^https?:\/\//i.test(value)) {
@@ -244,12 +240,7 @@ export function asInt(value: unknown): number | undefined {
 }
 
 export function firstDefined<T>(...values: Array<T | undefined | null>): T | undefined {
-    for (const value of values) {
-        if (value !== undefined && value !== null) {
-            return value;
-        }
-    }
-    return undefined;
+    return values.find(v => v != null) as T | undefined;
 }
 
 export function collapseCaption(value: string | undefined): string | undefined {

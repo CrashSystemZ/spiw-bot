@@ -27,7 +27,6 @@ export interface NormalizedMetadataUrl {
     sourceUrl: string;
     platform: MetadataPlatform;
     mediaId: string | null;
-    cacheKeySeed: string;
 }
 
 export interface ResolvedMetadata {

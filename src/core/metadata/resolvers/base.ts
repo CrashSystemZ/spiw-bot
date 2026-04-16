@@ -1,11 +1,11 @@
-import {MetadataResolveOptions, NormalizedMetadataUrl, ResolvedMetadata} from "../../types/metadata.js";
+import type { MetadataPlatform, MetadataResolveOptions, NormalizedMetadataUrl, ResolvedMetadata } from "../../types/metadata.js"
 
 export interface MetadataResolver {
-    readonly platform: string;
+    readonly platform: MetadataPlatform
 
-    canHandle(url: URL): boolean;
+    canHandle(url: URL): boolean
 
-    normalize(rawInput: string, options?: MetadataResolveOptions): Promise<NormalizedMetadataUrl>;
+    normalize(rawInput: string, options?: MetadataResolveOptions): Promise<NormalizedMetadataUrl>
 
-    resolve(normalized: NormalizedMetadataUrl, options?: MetadataResolveOptions): Promise<ResolvedMetadata>;
+    resolve(normalized: NormalizedMetadataUrl, options?: MetadataResolveOptions): Promise<ResolvedMetadata>
 }

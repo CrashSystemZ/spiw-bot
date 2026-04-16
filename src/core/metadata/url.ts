@@ -9,7 +9,6 @@ export interface UrlNormalizationResult {
     sourceUrl: string;
     platform: MetadataPlatform;
     mediaId: string | null;
-    cacheKeySeed: string;
 }
 
 export function extractUrlFromText(rawInput: string): string {
@@ -18,7 +17,7 @@ export function extractUrlFromText(rawInput: string): string {
         throw new UnsupportedUrlError("No URL was found in the input");
     }
 
-    const candidate = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+    const candidate = trimmed.startsWith("https://")
         ? trimmed.split(/\s+/u)[0]
         : extractFirstHttpUrl(trimmed);
 
@@ -36,7 +35,6 @@ export function normalizeGenericUrl(originalInput: string, extractedUrl: string,
         sourceUrl: normalizedUrl,
         platform,
         mediaId,
-        cacheKeySeed: mediaId ?? normalizedUrl,
     };
 }
 

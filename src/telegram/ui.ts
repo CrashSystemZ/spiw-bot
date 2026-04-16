@@ -1,7 +1,14 @@
 import {CallbackDataBuilder} from "@mtcute/dispatcher"
 import {BotInline, BotKeyboard} from "@mtcute/node"
 
-import type {InlineRequestContext, ResolvedMetadata, SessionAudioTrack, SessionMediaItem} from "../core/models.js"
+import type {
+    InlineRequestContext,
+    MediaKind,
+    ResolvedMetadata,
+    SessionAudioTrack,
+    SessionMediaItem
+} from "../core/models.js"
+import {shouldShowCaptionButton} from "../core/caption-policy.js"
 import {messages} from "../core/messages.js"
 
 export const carouselButton = new CallbackDataBuilder("car", "token", "index")
@@ -11,8 +18,8 @@ export const captionButton = new CallbackDataBuilder("cap", "token")
 export const retryButton = new CallbackDataBuilder("ret", "token")
 
 export function formatCaption(metadata: ResolvedMetadata) {
-    const title = cleanCaptionPart(metadata.title)
-    const description = cleanCaptionPart(metadata.description)
+    const title = metadata.title?.trim() || undefined
+    const description = metadata.description?.trim() || undefined
 
     if (!title && !description)
         return undefined
@@ -126,52 +133,21 @@ export function makeErrorResult(id: string, message: string) {
     })
 }
 
+const mediaTypeMap: Record<MediaKind, string> = {
+    photo: "photo", animation: "video", audio: "audio", document: "document", video: "video",
+}
+
 export function toInputMediaWithCaption(item: SessionMediaItem, metadata: ResolvedMetadata, includeCaption: boolean) {
     const caption = includeCaption ? (formatCaption(metadata) ?? "") : ""
-    switch (item.kind) {
-        case "photo":
-            return {
-                type: "photo",
-                file: item.buffer,
-                fileName: item.fileName,
-                caption,
-            } as any
-        case "animation":
-            return {
-                type: "video",
-                file: item.buffer,
-                fileName: item.fileName,
-                mimeType: item.mimeType ?? undefined,
-                caption,
-                isAnimated: true,
-            } as any
-        case "audio":
-            return {
-                type: "audio",
-                file: item.buffer,
-                fileName: item.fileName,
-                mimeType: item.mimeType ?? undefined,
-                caption,
-            } as any
-        case "document":
-            return {
-                type: "document",
-                file: item.buffer,
-                fileName: item.fileName,
-                mimeType: item.mimeType ?? undefined,
-                caption,
-            } as any
-        case "video":
-        default:
-            return {
-                type: "video",
-                file: item.buffer,
-                fileName: item.fileName,
-                mimeType: item.mimeType ?? undefined,
-                caption,
-                isAnimated: item.isAnimated ?? false,
-            } as any
-    }
+    return {
+        type: mediaTypeMap[item.kind] ?? "video",
+        file: item.buffer,
+        fileName: item.fileName,
+        ...(item.kind !== "photo" && {mimeType: item.mimeType ?? undefined}),
+        caption,
+        ...(item.kind === "animation" && {isAnimated: true}),
+        ...(item.kind === "video" && {isAnimated: item.isAnimated ?? false}),
+    } as any
 }
 
 export function toAudioMediaWithCaption(track: SessionAudioTrack, metadata: ResolvedMetadata, includeCaption: boolean) {
@@ -184,31 +160,4 @@ export function toAudioMediaWithCaption(track: SessionAudioTrack, metadata: Reso
     } as any
 }
 
-export function hasCaption(metadata: ResolvedMetadata) {
-    return Boolean(formatCaption(metadata))
-}
 
-function shouldShowCaptionButton(metadata: ResolvedMetadata) {
-    if (hasCaption(metadata))
-        return true
-    if (isPrettyMetadataLoaded(metadata))
-        return false
-    return metadata.platform === "tiktok"
-        || metadata.platform === "instagram"
-        || metadata.platform === "x"
-        || metadata.platform === "threads"
-}
-
-function isPrettyMetadataLoaded(metadata: ResolvedMetadata) {
-    return Boolean(
-        metadata.title
-        || metadata.thumbnailUrl
-        || metadata.previewUrl
-        || metadata.commentCount !== null,
-    )
-}
-
-function cleanCaptionPart(value: string | null) {
-    const trimmed = value?.trim()
-    return trimmed ? trimmed : undefined
-}

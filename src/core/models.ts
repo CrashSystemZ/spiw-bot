@@ -35,13 +35,7 @@ export type PendingRequestRecord = {
     createdAt: number
 }
 
-export type CachedMetadataRecord = {
-    cacheKey: string
-    createdAt: number
-    value: ResolvedMetadata
-}
-
-export type CachedRehydrateRecord = {
+export type CachedRecord = {
     cacheKey: string
     createdAt: number
     value: ResolvedMetadata

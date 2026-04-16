@@ -21,7 +21,10 @@
     "@mtcute/node": "^0.29.6",
     "better-sqlite3": "^12.9.0",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "lru-cache": "^11.3.5",
     "mediainfo.js": "^0.3.7",
+    "p-limit": "^7.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

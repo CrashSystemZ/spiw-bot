@@ -1,74 +1,53 @@
+import {LRUCache} from "lru-cache"
+
 import type {SessionEntry} from "./models.js"
 
 export class SessionStore {
-    readonly #entries = new Map<string, SessionEntry>()
-    #bytesUsed = 0
+    readonly #entries: LRUCache<string, SessionEntry>
 
     constructor(
-        private readonly budgetBytes: number,
+        budgetBytes: number,
         private readonly defaultTtlMs: number,
     ) {
+        this.#entries = new LRUCache<string, SessionEntry>({
+            maxSize: budgetBytes,
+            sizeCalculation: (entry) => entry.sizeBytes,
+            ttl: defaultTtlMs,
+            updateAgeOnGet: true,
+        })
     }
 
     get(cacheKey: string) {
-        const entry = this.#entries.get(cacheKey)
-        if (!entry)
-            return null
-        if (entry.expiresAt <= Date.now()) {
-            this.delete(cacheKey)
-            return null
-        }
-        this.#entries.delete(cacheKey)
-        this.#entries.set(cacheKey, entry)
-        return entry
+        return this.#entries.get(cacheKey) ?? null
     }
 
     set(entry: Omit<SessionEntry, "expiresAt"> & { expiresAt?: number }) {
+        const expiresAt = entry.expiresAt ?? (Date.now() + this.defaultTtlMs)
         const materialized: SessionEntry = {
             ...entry,
-            expiresAt: entry.expiresAt ?? (Date.now() + this.defaultTtlMs),
+            expiresAt,
         }
-
-        if (this.#entries.has(materialized.cacheKey))
-            this.delete(materialized.cacheKey)
-
-        this.#entries.set(materialized.cacheKey, materialized)
-        this.#bytesUsed += materialized.sizeBytes
-        this.cleanup()
+        this.#entries.set(materialized.cacheKey, materialized, {
+            ttl: Math.max(0, expiresAt - Date.now()),
+        })
     }
 
     updateMetadata(cacheKey: string, metadata: SessionEntry["metadata"]) {
         const entry = this.#entries.get(cacheKey)
         if (!entry)
             return null
-        entry.metadata = metadata
-        this.#entries.delete(cacheKey)
-        this.#entries.set(cacheKey, entry)
-        return entry
-    }
 
-    delete(cacheKey: string) {
-        const entry = this.#entries.get(cacheKey)
-        if (!entry)
-            return
-        this.#entries.delete(cacheKey)
-        this.#bytesUsed -= entry.sizeBytes
-        if (this.#bytesUsed < 0)
-            this.#bytesUsed = 0
+        const updated: SessionEntry = {
+            ...entry,
+            metadata,
+        }
+        this.#entries.set(cacheKey, updated, {
+            ttl: Math.max(0, updated.expiresAt - Date.now()),
+        })
+        return updated
     }
 
     cleanup() {
-        const now = Date.now()
-        for (const [key, entry] of this.#entries) {
-            if (entry.expiresAt <= now)
-                this.delete(key)
-        }
-
-        while (this.#bytesUsed > this.budgetBytes) {
-            const oldestKey = this.#entries.keys().next().value as string | undefined
-            if (!oldestKey)
-                break
-            this.delete(oldestKey)
-        }
+        this.#entries.purgeStale()
     }
 }

@@ -9,20 +9,8 @@ export interface FetchedHtml {
     status: number;
 }
 
-function makeTimeoutSignal(timeoutMs: number | undefined): { signal?: AbortSignal; cleanup: () => void } {
-    if (!timeoutMs || timeoutMs <= 0) {
-        return {cleanup: () => undefined};
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    return {
-        signal: controller.signal,
-        cleanup: () => clearTimeout(timer),
-    };
-}
-
 export async function fetchHtml(url: string, options: MetadataFetchOptions = {}): Promise<FetchedHtml> {
-    const {signal, cleanup} = makeTimeoutSignal(options.timeoutMs);
+    const signal = options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined;
     logInfo("metadata.fetch_html.start", {
         url,
         timeoutMs: options.timeoutMs ?? null,
@@ -67,13 +55,11 @@ export async function fetchHtml(url: string, options: MetadataFetchOptions = {})
         }
         logError("metadata.fetch_html.failed", error, {url})
         throw new MetadataUnavailableError("Failed to load the page");
-    } finally {
-        cleanup();
     }
 }
 
 export async function followRedirect(url: string, options: MetadataFetchOptions = {}): Promise<string> {
-    const {signal, cleanup} = makeTimeoutSignal(options.timeoutMs);
+    const signal = options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined;
     logInfo("metadata.follow_redirect.start", {
         url,
         timeoutMs: options.timeoutMs ?? null,
@@ -103,8 +89,6 @@ export async function followRedirect(url: string, options: MetadataFetchOptions 
             url,
             reason: error instanceof Error ? error.message : String(error),
         });
-    } finally {
-        cleanup();
     }
 
     logInfo("metadata.follow_redirect.fallback_fetch_html", {url});

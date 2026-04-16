@@ -108,145 +108,80 @@ function pad(value: number) {
     return String(value).padStart(2, "0")
 }
 
+type D = Record<string, unknown>
+
+const eventMessages: Record<string, (d: D) => string> = {
+    "process.start": () => "Process starting",
+    "process.unhandled_rejection": (d) => `Unhandled promise rejection — ${errorMessage(d.error)}`,
+    "process.uncaught_exception": (d) => `Uncaught exception — ${errorMessage(d.error)}`,
+    "bot.starting": (d) => `Bot starting — DB: ${stringValue(d.dbPath)}, session: ${stringValue(d.sessionPath)}, cobalt: ${stringValue(d.cobaltBaseUrl)}`,
+    "bot.started": (d) => `Bot started — cobalt: ${stringValue(d.cobaltBaseUrl)}`,
+    "runtime.init": () => "Runtime initialized",
+    "bot.inline_query.received": (d) => `Received query - ${stringValue(d.rawQuery) || "<empty>"}`,
+    "bot.inline_query.failed": (d) => `Inline query failed — ${stringValue(d.rawQuery)} — ${errorMessage(d.error)}`,
+    "runtime.inline_request.create": (d) => `Creating inline request for ${stringValue(d.rawQuery)}`,
+    "runtime.inline_request.created": (d) => `Inline request created — ${shortId(stringValue(d.requestId))}, ${stringValue(d.platform)}, ${stringValue(d.normalizedUrl)}`,
+    "runtime.metadata.load.start": (d) => `Preparing request data for ${stringValue(d.parsedUrl)}`,
+    "runtime.rehydrate.cache_hit": (d) => `Rehydrate cache hit — ${stringValue(d.platform)}, ${stringValue(d.normalizedUrl)}`,
+    "runtime.rehydrate.cached": (d) => `Rehydrate data cached — ${stringValue(d.platform)}, ${stringValue(d.normalizedUrl)}`,
+    "runtime.rehydrate.normalize_failed": (d) => `URL normalization failed for ${stringValue(d.parsedUrl)}`,
+    "runtime.metadata.resolved": (d) => `Metadata resolved — platform: ${stringValue(d.platform)}, title: ${quoted(d.title)}, comments: ${numberOrDash(d.commentCount)}`,
+    "runtime.metadata.resolve_fallback": (d) => `Metadata resolve fallback for ${stringValue(d.parsedUrl)}`,
+    "runtime.metadata.cache_hit": (d) => `Metadata cache hit — ${stringValue(d.platform)}, ${stringValue(d.alias)}`,
+    "runtime.metadata.cached": () => "Metadata cached",
+    "runtime.pretty_metadata.cache_hit": (d) => `Pretty metadata cache hit — title: ${quoted(d.title)}, comments: ${numberOrDash(d.commentCount)}`,
+    "runtime.pretty_metadata.load.start": (d) => `Loading post metadata for ${stringValue(d.normalizedUrl)}`,
+    "runtime.pretty_metadata.load.ok": (d) => `Post metadata loaded — title: ${quoted(d.title)}, comments: ${numberOrDash(d.commentCount)}`,
+    "runtime.pretty_metadata.load.failed": (d) => `Post metadata load failed for ${stringValue(d.normalizedUrl)} — ${stringValue(d.reason)}`,
+    "metadata.follow_redirect.start": (d) => `Resolving short link ${stringValue(d.url)}`,
+    "metadata.follow_redirect.ok": (d) => `Short link resolved to ${stringValue(d.finalUrl)}`,
+    "metadata.follow_redirect.head_failed": (d) => `HEAD redirect failed for ${stringValue(d.url)} — ${stringValue(d.reason)}`,
+    "metadata.follow_redirect.fallback_fetch_html": (d) => `Falling back to full HTML fetch for ${stringValue(d.url)}`,
+    "metadata.fetch_html.start": (d) => `Fetching HTML from ${stringValue(d.url)}`,
+    "metadata.fetch_html.ok": (d) => `HTML fetched successfully (${numberOrDash(d.htmlLength)} bytes), status ${numberOrDash(d.status)}`,
+    "metadata.fetch_html.http_error": (d) => `HTML fetch failed — status ${numberOrDash(d.status)} for ${stringValue(d.url)}`,
+    "metadata.fetch_html.failed": (d) => `HTML fetch threw for ${stringValue(d.url)} — ${errorMessage(d.error)}`,
+    "metadata.tiktok.player_api.start": (d) => `Fetching TikTok metadata for ${stringValue(d.mediaId)}`,
+    "metadata.tiktok.player_api.ok": (d) => `TikTok metadata fetched — itemCount ${numberOrDash(d.itemCount)}, stats ${boolWord(d.hasStats)}`,
+    "metadata.tiktok.player_api.http_error": (d) => `TikTok metadata HTTP error — status ${numberOrDash(d.status)}`,
+    "metadata.tiktok.player_api.failed": (d) => `TikTok metadata fetch failed — ${errorMessage(d.error)}`,
+    "metadata.x.syndication.request": (d) => `Fetching X syndication metadata for tweet ${stringValue(d.tweetId)}`,
+    "metadata.x.syndication.response": (d) => `X syndication responded with status ${numberOrDash(d.status)}`,
+    "metadata.x.syndication.failed": (d) => `X syndication failed for tweet ${stringValue(d.tweetId)} — ${stringValue(d.error)}`,
+    "metadata.x.html_fallback": (d) => `X HTML fallback used for ${stringValue(d.mediaId)}`,
+    "runtime.session.hydrate_for_request.start": (d) => `Hydrating session for request ${shortId(stringValue(d.requestId))}`,
+    "runtime.session.hydrate_for_request.ok": (d) => `Session hydrated for ${shortId(stringValue(d.requestId))} — ${numberOrDash(d.itemCount)} item(s), ${size(d.sizeBytes)}, ${audioWord(d.hasAudio)}`,
+    "runtime.session.hydrate_from_cache_key.start": (d) => `Hydrating session from cache ${shortId(stringValue(d.cacheKey))}`,
+    "runtime.session.hydrate_from_cache_key.ok": (d) => `Session restored from cache — ${numberOrDash(d.itemCount)} item(s), ${size(d.sizeBytes)}, ${audioWord(d.hasAudio)}`,
+    "runtime.session.cache_hit": (d) => `Session cache hit — ${numberOrDash(d.itemCount)} item(s), ${size(d.sizeBytes)}`,
+    "runtime.session.build.start": (d) => `Building session for ${stringValue(d.platform)} — ${stringValue(d.normalizedUrl)}`,
+    "runtime.session.build.ok": (d) => `Session built successfully — ${numberOrDash(d.itemCount)} item(s), ${size(d.sizeBytes)}, ${audioWord(d.hasAudio)}`,
+    "runtime.session.single_downloaded": (d) => `File analysed — ${stringValue(path(d, "analysis.kind"))}, ${durationValue(path(d, "analysis.duration"))}, ${dimensionValue(path(d, "analysis.width"), path(d, "analysis.height"))}, ${size(d.sizeBytes)}`,
+    "runtime.session.picker_item_downloaded": (d) => `Carousel item analysed — #${numberOrDash(d.index)}, ${stringValue(path(d, "analysis.kind"))}, ${dimensionValue(path(d, "analysis.width"), path(d, "analysis.height"))}, ${size(d.sizeBytes)}`,
+    "runtime.session.audio_downloaded": (d) => `Audio track downloaded — ${stringValue(d.mimeType)}, ${size(d.sizeBytes)}`,
+    "cobalt.resolve.request": (d) => `Sending resolve request to cobalt — quality: ${stringValue(d.videoQuality)}p, codec: ${stringValue(d.youtubeVideoCodec)}, audio: ${stringValue(d.audioFormat)}/${stringValue(d.audioBitrate)}kbps, proxy: ${boolWord(d.alwaysProxy)}`,
+    "cobalt.resolve.response": cobaltResolveMessage,
+    "cobalt.resolve.retrying": (d) => `Retrying cobalt resolve after ${stringValue(d.errorCode)} (alwaysProxy was ${boolWord(d.attemptedAlwaysProxy)})`,
+    "cobalt.fetch_binary.start": () => `Downloading binary from cobalt tunnel`,
+    "cobalt.fetch_binary.ok": (d) => `Binary downloaded — ${stringValue(d.mimeType)}, ${numberOrDash(d.sizeBytes)} bytes (${size(d.sizeBytes)})`,
+    "cobalt.fetch_binary.http_error": (d) => `Binary download failed — status ${numberOrDash(d.status)} for ${stringValue(d.url)}`,
+    "bot.chosen_inline.received": () => `Received chosen result`,
+    "bot.chosen_inline.edit_media": (d) => `Editing inline message media — ${numberOrDash(d.itemCount)} item(s), ${mediaSummary(d.firstItem)}, ${audioWord(d.hasAudio)}, ${numberOrDash(d.replyMarkupRows)} reply markup row(s)`,
+    "bot.chosen_inline.edit_media.ok": () => `Inline message updated successfully`,
+    "bot.chosen_inline.failed": (d) => `Chosen inline failed — ${stringValue(d.query)} — ${errorMessage(d.error)}`,
+    "bot.chosen_inline.error_message_set": (d) => `Fallback error message set — ${stringValue(d.message)}`,
+    "bot.callback.carousel": (d) => `Carousel click — token ${shortId(stringValue(d.token))}, index ${stringValue(d.index)}`,
+    "bot.callback.audio": (d) => `Audio mode click — token ${shortId(stringValue(d.token))}, index ${stringValue(d.index)}`,
+    "bot.callback.photo": (d) => `Photo mode click — token ${shortId(stringValue(d.token))}, index ${stringValue(d.index)}`,
+    "bot.callback.caption": (d) => `Caption toggle — token ${shortId(stringValue(d.token))}, mode ${stringValue(d.mode)}, index ${numberOrDash(d.index)}, visible ${boolWord(d.captionVisible)}`,
+    "bot.callback.retry": (d) => `Retry click — token ${shortId(stringValue(d.token))}`,
+    "bot.callback.retry.failed": (d) => `Retry failed — ${errorMessage(d.error)}`,
+    "telegram.dispatcher.rpc_ignored": (d) => `Ignoring Telegram RPC error ${stringValue(d.code)}${d.method ? ` on ${stringValue(d.method)}` : ""}`,
+    "telegram.dispatcher.unhandled_error": (d) => `Unhandled Telegram dispatcher error — ${errorMessage(d.error)}`,
+}
+
 function messageForEvent(event: string, data: Record<string, unknown>) {
-    switch (event) {
-        case "process.start":
-            return "Process starting"
-        case "process.unhandled_rejection":
-            return `Unhandled promise rejection — ${errorMessage(data.error)}`
-        case "process.uncaught_exception":
-            return `Uncaught exception — ${errorMessage(data.error)}`
-        case "bot.starting":
-            return `Bot starting — DB: ${stringValue(data.dbPath)}, session: ${stringValue(data.sessionPath)}, cobalt: ${stringValue(data.cobaltBaseUrl)}`
-        case "bot.started":
-            return `Bot started — cobalt: ${stringValue(data.cobaltBaseUrl)}`
-        case "runtime.init":
-            return "Runtime initialized"
-        case "bot.inline_query.received":
-            return `Received query - ${stringValue(data.rawQuery) || "<empty>"}`
-        case "bot.inline_query.failed":
-            return `Inline query failed — ${stringValue(data.rawQuery)} — ${errorMessage(data.error)}`
-        case "runtime.inline_request.create":
-            return `Creating inline request for ${stringValue(data.rawQuery)}`
-        case "runtime.inline_request.created":
-            return `Inline request created — ${shortId(stringValue(data.requestId))}, ${stringValue(data.platform)}, ${stringValue(data.normalizedUrl)}`
-        case "runtime.metadata.load.start":
-            return `Preparing request data for ${stringValue(data.parsedUrl)}`
-        case "runtime.rehydrate.cache_hit":
-            return `Rehydrate cache hit — ${stringValue(data.platform)}, ${stringValue(data.normalizedUrl)}`
-        case "runtime.rehydrate.cached":
-            return `Rehydrate data cached — ${stringValue(data.platform)}, ${stringValue(data.normalizedUrl)}`
-        case "runtime.rehydrate.normalize_failed":
-            return `URL normalization failed for ${stringValue(data.parsedUrl)}`
-        case "runtime.metadata.resolved":
-            return `Metadata resolved — platform: ${stringValue(data.platform)}, title: ${quoted(data.title)}, comments: ${numberOrDash(data.commentCount)}`
-        case "runtime.metadata.resolve_fallback":
-            return `Metadata resolve fallback for ${stringValue(data.parsedUrl)}`
-        case "runtime.metadata.cache_hit":
-            return `Metadata cache hit — ${stringValue(data.platform)}, ${stringValue(data.alias)}`
-        case "runtime.metadata.cached":
-            return "Metadata cached"
-        case "runtime.pretty_metadata.cache_hit":
-            return `Pretty metadata cache hit — title: ${quoted(data.title)}, comments: ${numberOrDash(data.commentCount)}`
-        case "runtime.pretty_metadata.load.start":
-            return `Loading post metadata for ${stringValue(data.normalizedUrl)}`
-        case "runtime.pretty_metadata.load.ok":
-            return `Post metadata loaded — title: ${quoted(data.title)}, comments: ${numberOrDash(data.commentCount)}`
-        case "runtime.pretty_metadata.load.failed":
-            return `Post metadata load failed for ${stringValue(data.normalizedUrl)} — ${stringValue(data.reason)}`
-        case "metadata.follow_redirect.start":
-            return `Resolving short link ${stringValue(data.url)}`
-        case "metadata.follow_redirect.ok":
-            return `Short link resolved to ${stringValue(data.finalUrl)}`
-        case "metadata.follow_redirect.head_failed":
-            return `HEAD redirect failed for ${stringValue(data.url)} — ${stringValue(data.reason)}`
-        case "metadata.follow_redirect.fallback_fetch_html":
-            return `Falling back to full HTML fetch for ${stringValue(data.url)}`
-        case "metadata.fetch_html.start":
-            return `Fetching HTML from ${stringValue(data.url)}`
-        case "metadata.fetch_html.ok":
-            return `HTML fetched successfully (${numberOrDash(data.htmlLength)} bytes), status ${numberOrDash(data.status)}`
-        case "metadata.fetch_html.http_error":
-            return `HTML fetch failed — status ${numberOrDash(data.status)} for ${stringValue(data.url)}`
-        case "metadata.fetch_html.failed":
-            return `HTML fetch threw for ${stringValue(data.url)} — ${errorMessage(data.error)}`
-        case "metadata.tiktok.player_api.start":
-            return `Fetching TikTok metadata for ${stringValue(data.mediaId)}`
-        case "metadata.tiktok.player_api.ok":
-            return `TikTok metadata fetched — itemCount ${numberOrDash(data.itemCount)}, stats ${boolWord(data.hasStats)}`
-        case "metadata.tiktok.player_api.http_error":
-            return `TikTok metadata HTTP error — status ${numberOrDash(data.status)}`
-        case "metadata.tiktok.player_api.failed":
-            return `TikTok metadata fetch failed — ${errorMessage(data.error)}`
-        case "metadata.x.syndication.request":
-            return `Fetching X syndication metadata for tweet ${stringValue(data.tweetId)}`
-        case "metadata.x.syndication.response":
-            return `X syndication responded with status ${numberOrDash(data.status)}`
-        case "metadata.x.syndication.failed":
-            return `X syndication failed for tweet ${stringValue(data.tweetId)} — ${stringValue(data.error)}`
-        case "metadata.x.html_fallback":
-            return `X HTML fallback used for ${stringValue(data.mediaId)}`
-        case "runtime.session.hydrate_for_request.start":
-            return `Hydrating session for request ${shortId(stringValue(data.requestId))}`
-        case "runtime.session.hydrate_for_request.ok":
-            return `Session hydrated for ${shortId(stringValue(data.requestId))} — ${numberOrDash(data.itemCount)} item(s), ${size(data.sizeBytes)}, ${audioWord(data.hasAudio)}`
-        case "runtime.session.hydrate_from_cache_key.start":
-            return `Hydrating session from cache ${shortId(stringValue(data.cacheKey))}`
-        case "runtime.session.hydrate_from_cache_key.ok":
-            return `Session restored from cache — ${numberOrDash(data.itemCount)} item(s), ${size(data.sizeBytes)}, ${audioWord(data.hasAudio)}`
-        case "runtime.session.cache_hit":
-            return `Session cache hit — ${numberOrDash(data.itemCount)} item(s), ${size(data.sizeBytes)}`
-        case "runtime.session.build.start":
-            return `Building session for ${stringValue(data.platform)} — ${stringValue(data.normalizedUrl)}`
-        case "runtime.session.build.ok":
-            return `Session built successfully — ${numberOrDash(data.itemCount)} item(s), ${size(data.sizeBytes)}, ${audioWord(data.hasAudio)}`
-        case "runtime.session.single_downloaded":
-            return `File analysed — ${stringValue(path(data, "analysis.kind"))}, ${durationValue(path(data, "analysis.duration"))}, ${dimensionValue(path(data, "analysis.width"), path(data, "analysis.height"))}, ${size(data.sizeBytes)}`
-        case "runtime.session.picker_item_downloaded":
-            return `Carousel item analysed — #${numberOrDash(data.index)}, ${stringValue(path(data, "analysis.kind"))}, ${dimensionValue(path(data, "analysis.width"), path(data, "analysis.height"))}, ${size(data.sizeBytes)}`
-        case "runtime.session.audio_downloaded":
-            return `Audio track downloaded — ${stringValue(data.mimeType)}, ${size(data.sizeBytes)}`
-        case "cobalt.resolve.request":
-            return `Sending resolve request to cobalt — quality: ${stringValue(data.videoQuality)}p, codec: ${stringValue(data.youtubeVideoCodec)}, audio: ${stringValue(data.audioFormat)}/${stringValue(data.audioBitrate)}kbps, proxy: ${boolWord(data.alwaysProxy)}`
-        case "cobalt.resolve.response":
-            return cobaltResolveMessage(data)
-        case "cobalt.resolve.retrying":
-            return `Retrying cobalt resolve after ${stringValue(data.errorCode)} (alwaysProxy was ${boolWord(data.attemptedAlwaysProxy)})`
-        case "cobalt.fetch_binary.start":
-            return `Downloading binary from cobalt tunnel`
-        case "cobalt.fetch_binary.ok":
-            return `Binary downloaded — ${stringValue(data.mimeType)}, ${numberOrDash(data.sizeBytes)} bytes (${size(data.sizeBytes)})`
-        case "cobalt.fetch_binary.http_error":
-            return `Binary download failed — status ${numberOrDash(data.status)} for ${stringValue(data.url)}`
-        case "bot.chosen_inline.received":
-            return `Received chosen result`
-        case "bot.chosen_inline.edit_media":
-            return `Editing inline message media — ${numberOrDash(data.itemCount)} item(s), ${mediaSummary(data.firstItem)}, ${audioWord(data.hasAudio)}, ${numberOrDash(data.replyMarkupRows)} reply markup row(s)`
-        case "bot.chosen_inline.edit_media.ok":
-            return `Inline message updated successfully`
-        case "bot.chosen_inline.failed":
-            return `Chosen inline failed — ${stringValue(data.query)} — ${errorMessage(data.error)}`
-        case "bot.chosen_inline.error_message_set":
-            return `Fallback error message set — ${stringValue(data.message)}`
-        case "bot.callback.carousel":
-            return `Carousel click — token ${shortId(stringValue(data.token))}, index ${stringValue(data.index)}`
-        case "bot.callback.audio":
-            return `Audio mode click — token ${shortId(stringValue(data.token))}, index ${stringValue(data.index)}`
-        case "bot.callback.photo":
-            return `Photo mode click — token ${shortId(stringValue(data.token))}, index ${stringValue(data.index)}`
-        case "bot.callback.caption":
-            return `Caption toggle — token ${shortId(stringValue(data.token))}, mode ${stringValue(data.mode)}, index ${numberOrDash(data.index)}, visible ${boolWord(data.captionVisible)}`
-        case "bot.callback.retry":
-            return `Retry click — token ${shortId(stringValue(data.token))}`
-        case "bot.callback.retry.failed":
-            return `Retry failed — ${errorMessage(data.error)}`
-        case "telegram.dispatcher.rpc_ignored":
-            return `Ignoring Telegram RPC error ${stringValue(data.code)}${data.method ? ` on ${stringValue(data.method)}` : ""}`
-        case "telegram.dispatcher.unhandled_error":
-            return `Unhandled Telegram dispatcher error — ${errorMessage(data.error)}`
-        default:
-            return undefined
-    }
+    return eventMessages[event]?.(data)
 }
 
 function cobaltResolveMessage(data: Record<string, unknown>) {
