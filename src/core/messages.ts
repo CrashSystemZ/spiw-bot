@@ -31,7 +31,6 @@ const REQUIRED_KEYS: MessageKey[] = [
 
 function loadMessages(): Readonly<Record<MessageKey, string>> {
     const here = dirname(fileURLToPath(import.meta.url))
-    // dist/core/messages.js or src/core/messages.ts → ../../resources/messages.json
     const resourcePath = resolve(here, "../../resources/messages.json")
     const raw = JSON.parse(readFileSync(resourcePath, "utf8")) as Record<string, unknown>
 

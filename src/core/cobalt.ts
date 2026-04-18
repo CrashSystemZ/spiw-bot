@@ -92,8 +92,6 @@ export class CobaltClient {
             if (result.kind === "success")
                 return result.response
             if (result.kind === "content_error")
-                // контентные ошибки (private, region, unsupported, too_long) — не зависят от endpoint'а,
-                // возвращаем сразу.
                 return result.response
 
             lastFailure = result.lastError
@@ -105,8 +103,6 @@ export class CobaltClient {
                 triedEndpoints: epIdx + 1,
                 remainingEndpoints: endpoints.length - epIdx - 1,
             })
-            // Auth-ошибки (Turnstile / Api-Key) — не transient, баним endpoint
-            // до следующего refresh-цикла, чтоб не тратить время повторно.
             if (errorCode && isAuthError(errorCode))
                 this.#pool.banEndpoint(endpoint.url, errorCode)
             if (isLast)
@@ -119,8 +115,6 @@ export class CobaltClient {
     }
 
     async fetchBinary(url: string, preferredFileName: string | undefined, maxBytes: number) {
-        // 2 attempts: empty body on first try is often a transient proxy glitch
-        // (tunnel valid, upstream momentarily blank). Second try frequently works.
         const attempts = 2
         let lastEmptyError: MediaUnavailableError | null = null
         for (let attempt = 0; attempt < attempts; attempt++) {
@@ -129,9 +123,7 @@ export class CobaltClient {
             try {
                 return await this.#fetchBinaryOnce(url, preferredFileName, maxBytes)
             } catch (error) {
-                // Retry only on "HTTP 200 but empty body" — this is a transient cobalt-proxy glitch.
-                // HTTP 4xx/5xx errors won't change on retry.
-                const isEmpty = error instanceof MediaUnavailableError
+               const isEmpty = error instanceof MediaUnavailableError
                     && error.reason === "cobalt_failed"
                     && error.httpStatus === 200
                 if (!isEmpty || attempt === attempts - 1)
@@ -217,10 +209,6 @@ export class CobaltClient {
     }
 
     async #tryEndpoint(endpoint: CobaltEndpoint, request: CobaltRequest): Promise<EndpointResult> {
-        // Attempts, in order:
-        //   0: alwaysProxy=false, no delay — the fast happy path.
-        //   1: alwaysProxy=true,  no delay — covers geo/blocked direct fetches.
-        //   2: alwaysProxy=true,  750ms delay — backoff for transient upstream glitches.
         const attempts: ReadonlyArray<{alwaysProxy: boolean; delayMs: number}> = [
             {alwaysProxy: false, delayMs: 0},
             {alwaysProxy: true, delayMs: 0},
@@ -269,8 +257,6 @@ export class CobaltClient {
             const body = await response.json().catch(() => null) as CobaltResponse | null
             if (!body || typeof body !== "object" || !("status" in body)) {
                 logWarn("cobalt.resolve.bad_body", {endpoint: endpoint.name, httpStatus: response.status})
-                // HTTP 401/403/407 с нераспознанным body = endpoint требует auth / Turnstile.
-                // Нет смысла ретраить на этом endpoint — бaним и идём дальше.
                 if (response.status === 401 || response.status === 403 || response.status === 407) {
                     this.#pool.banEndpoint(endpoint.url, `http_${response.status}`)
                     break
@@ -323,10 +309,6 @@ export function cobaltErrorToDomain(code: string): DomainError {
 }
 
 function shouldRetryCobaltError(code: string) {
-    // Transient upstream glitches:
-    //   error.api.fetch.fail  — upstream returned 4xx/5xx
-    //   error.api.fetch.empty — upstream returned 200 with empty body (IG/TikTok bot-check common case)
-    // Content errors (private, region, too_long, unsupported) do not retry.
     return code === "error.api.fetch.fail" || code === "error.api.fetch.empty"
 }
 
@@ -414,9 +396,6 @@ function normalizeCobaltResponseUrls(response: CobaltSuccess, endpoint: CobaltEn
 }
 
 function rewriteCobaltUrl(url: string, endpoint: CobaltEndpoint) {
-    // Internal hostnames like "cobalt" (docker internal DNS), "localhost", "127.0.0.1" —
-    // замещаем хостом endpoint'а, чтобы тянуть tunnel снаружи docker-сети.
-    // Внешние hostnames оставляем нетронутыми.
     try {
         const parsed = new URL(url)
         if (!INTERNAL_HOSTNAMES.has(parsed.hostname))

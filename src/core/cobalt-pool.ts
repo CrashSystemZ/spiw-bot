@@ -14,11 +14,9 @@ type DiscoveryConfig = {
     requestTimeoutMs: number
 }
 
-// Хосты, которые cobalt.directory иногда возвращает, но для нас они бесполезны:
-// requires Turnstile JWT / Api-Key авторизация. Гарантированно получим HTTP 403.
 const EXCLUDED_HOST_SUFFIXES = [
-    "imput.net",        // official cobalt.tools backend, требует Turnstile
-    "api.cobalt.tools", // same
+    "imput.net",
+    "api.cobalt.tools",
 ]
 
 export class CobaltPool {
@@ -122,7 +120,6 @@ export class CobaltPool {
             }
 
             this.#dynamic = merged
-            // Свежий список — даём забаненным второй шанс.
             this.#bannedHosts = new Set()
             logInfo("cobalt.pool.refreshed", {
                 staticCount: this.#static.length,
