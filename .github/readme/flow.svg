@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 290" role="img" aria-labelledby="t d">
+  <title id="t">How spiw-bot delivers a post</title>
+  <desc id="d">Inline query, whitelist and card happen while you type. After the card is sent, cobalt finds the files, they are downloaded into RAM and uploaded to Telegram once, and the card is edited into the media. A post seen before skips all of that and is answered with the file itself.</desc>
+  <defs>
+    <clipPath id="frame"><rect width="880" height="290" rx="24"/></clipPath>
+    <radialGradient id="glowBlue"><stop offset="0" stop-color="#2aabee" stop-opacity=".28"/><stop offset="1" stop-color="#2aabee" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowOrange"><stop offset="0" stop-color="#f7632a" stop-opacity=".22"/><stop offset="1" stop-color="#f7632a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3fb950"/><stop offset="1" stop-color="#2aabee"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" fill-opacity=".05"/></pattern>
+    <marker id="tip" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 6.5 4 1 7" fill="none" stroke="#8b98a9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  </defs>
+  <style>
+    text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+    .mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+    .k{font-size:10.5px;fill:#6d7a8c}
+    .h{font-size:14.5px;font-weight:650;fill:#f0f4f8}
+    .p{font-size:11px;fill:#9aa7b8}
+    .box{fill:#0f1520;stroke:#fff;stroke-opacity:.12}
+    .wire{fill:none;stroke:#8b98a9;stroke-width:1.5;stroke-dasharray:3 4;animation:wire 1s linear infinite}
+    @keyframes wire{to{stroke-dashoffset:-14}}
+    .fast{fill:none;stroke:url(#arc);stroke-width:2;stroke-dasharray:6 6;animation:fast 1.2s linear infinite}
+    @keyframes fast{to{stroke-dashoffset:-24}}
+    @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+
+  <g clip-path="url(#frame)">
+    <rect width="880" height="290" fill="#090c13"/>
+    <circle cx="80" cy="290" r="300" fill="url(#glowBlue)"/>
+    <circle cx="820" cy="0" r="300" fill="url(#glowOrange)"/>
+    <rect width="880" height="290" fill="url(#dots)"/>
+  </g>
+  <rect x=".5" y=".5" width="879" height="289" rx="23.5" fill="none" stroke="#fff" stroke-opacity=".1"/>
+
+  <!-- the shortcut for a post already on Telegram -->
+  <path class="fast" d="M228 116C228 34 793 34 793 116"/>
+  <circle r="4.5" fill="#6ee787"><animateMotion dur="2.8s" repeatCount="indefinite" path="M228 116C228 34 793 34 793 116"/></circle>
+  <path d="M787 108l6 9 6-9" fill="none" stroke="#2aabee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="352" y="41" width="317" height="28" rx="14" fill="#0d1420" stroke="#3fb950" stroke-opacity=".6"/>
+  <circle cx="370" cy="55" r="4" fill="#3fb950"/>
+  <text x="382" y="59.5" font-size="12" font-weight="600" fill="#d7f5dd" textLength="272" lengthAdjust="spacing">seen before? answered with the file itself</text>
+
+  <!-- stages -->
+  <g>
+    <rect class="box" x="28.5" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="42" y="118" width="26" height="3" rx="1.5" fill="#2aabee"/>
+    <text class="mono k" x="42" y="140">01</text>
+    <text class="h" x="42" y="161">Inline query</text>
+    <text class="p"><tspan x="42" y="179">@bot and a link,</tspan><tspan x="42" y="193">in any chat</tspan></text>
+  </g>
+  <g>
+    <rect class="box" x="169.7" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="183" y="118" width="26" height="3" rx="1.5" fill="#2aabee"/>
+    <text class="mono k" x="183" y="140">02</text>
+    <text class="h" x="183" y="161">Whitelist</text>
+    <text class="p"><tspan x="183" y="179">3 platforms,</tspan><tspan x="183" y="193">canonical URL</tspan></text>
+  </g>
+  <g>
+    <rect class="box" x="310.9" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="324" y="118" width="26" height="3" rx="1.5" fill="#2aabee"/>
+    <text class="mono k" x="324" y="140">03</text>
+    <text class="h" x="324" y="161">Card</text>
+    <text class="p"><tspan x="324" y="179">a placeholder</tspan><tspan x="324" y="193">you send</tspan></text>
+  </g>
+  <g>
+    <rect class="box" x="452.1" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="465" y="118" width="26" height="3" rx="1.5" fill="#f7632a"/>
+    <text class="mono k" x="465" y="140">04</text>
+    <text class="h" x="465" y="161">cobalt</text>
+    <text class="p"><tspan x="465" y="179">our own instance</tspan><tspan x="465" y="193">finds the files</tspan></text>
+  </g>
+  <g>
+    <rect class="box" x="593.3" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="607" y="118" width="26" height="3" rx="1.5" fill="#f7632a"/>
+    <text class="mono k" x="607" y="140">05</text>
+    <text class="h" x="607" y="161">RAM</text>
+    <text class="p"><tspan x="607" y="179">download, probe,</tspan><tspan x="607" y="193">never on disk</tspan></text>
+  </g>
+  <g>
+    <rect class="box" x="734.5" y="118.5" width="117" height="86" rx="14"/>
+    <rect x="748" y="118" width="26" height="3" rx="1.5" fill="#2aabee"/>
+    <text class="mono k" x="748" y="140">06</text>
+    <text class="h" x="748" y="161">Telegram</text>
+    <text class="p"><tspan x="748" y="179">upload once,</tspan><tspan x="748" y="193">edit the card</tspan></text>
+  </g>
+
+  <path class="wire" d="M148 161.5h18" marker-end="url(#tip)"/>
+  <path class="wire" d="M289.2 161.5h18" marker-end="url(#tip)"/>
+  <path class="wire" d="M430.4 161.5h18" marker-end="url(#tip)"/>
+  <path class="wire" d="M571.6 161.5h18" marker-end="url(#tip)"/>
+  <path class="wire" d="M712.8 161.5h18" marker-end="url(#tip)"/>
+
+  <!-- phases -->
+  <path d="M32 222v6h392v-6" fill="none" stroke="#2aabee" stroke-opacity=".55" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="228" y="247" font-size="12" font-weight="600" fill="#9fd8fb" text-anchor="middle">while you type</text>
+  <path d="M456 222v6h392v-6" fill="none" stroke="#f7632a" stroke-opacity=".6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="652" y="247" font-size="12" font-weight="600" fill="#ffc4a3" text-anchor="middle">after you send the card</text>
+
+  <text class="mono" x="440" y="273" font-size="10.5" fill="#6d7a8c" text-anchor="middle">SQLite remembers Telegram file ids, link aliases and stats. Media is never stored.</text>
+</svg>

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 128" role="img" aria-labelledby="t d">
+  <title id="t">spiw-bot in numbers</title>
+  <desc id="d">A 6 MB static binary, a 17 MB Docker image, about 3 MB of RAM when idle, and no open ports.</desc>
+  <defs>
+    <clipPath id="c1"><rect x="0" width="208" height="128" rx="18"/></clipPath>
+    <clipPath id="c2"><rect x="224" width="208" height="128" rx="18"/></clipPath>
+    <clipPath id="c3"><rect x="448" width="208" height="128" rx="18"/></clipPath>
+    <clipPath id="c4"><rect x="672" width="208" height="128" rx="18"/></clipPath>
+    <linearGradient id="n1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#5cc3f5"/></linearGradient>
+    <linearGradient id="n2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#ff9a62"/></linearGradient>
+    <linearGradient id="n3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#6ee787"/></linearGradient>
+    <linearGradient id="n4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f08cc8"/></linearGradient>
+    <radialGradient id="g1"><stop offset="0" stop-color="#2aabee" stop-opacity=".4"/><stop offset="1" stop-color="#2aabee" stop-opacity="0"/></radialGradient>
+    <radialGradient id="g2"><stop offset="0" stop-color="#f7632a" stop-opacity=".4"/><stop offset="1" stop-color="#f7632a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="g3"><stop offset="0" stop-color="#3fb950" stop-opacity=".36"/><stop offset="1" stop-color="#3fb950" stop-opacity="0"/></radialGradient>
+    <radialGradient id="g4"><stop offset="0" stop-color="#d6409f" stop-opacity=".4"/><stop offset="1" stop-color="#d6409f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <style>
+    text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+    .l{font-size:10.5px;font-weight:700;fill:#8b98a9;letter-spacing:1.4px}
+    .n{font-size:46px;font-weight:800}
+    .u{font-size:20px;font-weight:700}
+    .cap{font-size:12px;fill:#9aa7b8}
+    .shine{opacity:0;animation:shine 7s ease-in-out infinite}
+    .shine.k2{animation-delay:.5s}.shine.k3{animation-delay:1s}.shine.k4{animation-delay:1.5s}
+    @keyframes shine{0%,62%{opacity:0;transform:translateX(0)}66%{opacity:1}88%{opacity:1}92%,100%{opacity:0;transform:translateX(330px)}}
+    .glow{animation:glow 5s ease-in-out infinite alternate}
+    .glow.k2{animation-delay:-1.2s}.glow.k3{animation-delay:-2.4s}.glow.k4{animation-delay:-3.6s}
+    @keyframes glow{from{opacity:.55}to{opacity:1}}
+    @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+
+  <g clip-path="url(#c1)">
+    <rect x="0" width="208" height="128" fill="#0b0f17"/>
+    <circle class="glow" cx="190" cy="0" r="120" fill="url(#g1)"/>
+    <g transform="skewX(-20)"><rect class="shine" x="-40" width="56" height="128" fill="#fff" fill-opacity=".07"/></g>
+    <text class="l" x="22" y="34">BINARY</text>
+    <text x="22" y="84" fill="url(#n1)"><tspan class="n">6</tspan><tspan class="u" dx="6">MB</tspan></text>
+    <text class="cap" x="22" y="108">static, musl, no libc</text>
+  </g>
+  <rect x=".5" y=".5" width="207" height="127" rx="17.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+
+  <g clip-path="url(#c2)">
+    <rect x="224" width="208" height="128" fill="#0b0f17"/>
+    <circle class="glow k2" cx="414" cy="0" r="120" fill="url(#g2)"/>
+    <g transform="skewX(-20)"><rect class="shine k2" x="184" width="56" height="128" fill="#fff" fill-opacity=".07"/></g>
+    <text class="l" x="246" y="34">DOCKER IMAGE</text>
+    <text x="246" y="84" fill="url(#n2)"><tspan class="n">17</tspan><tspan class="u" dx="6">MB</tspan></text>
+    <text class="cap" x="246" y="108">FROM scratch + CA bundle</text>
+  </g>
+  <rect x="224.5" y=".5" width="207" height="127" rx="17.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+
+  <g clip-path="url(#c3)">
+    <rect x="448" width="208" height="128" fill="#0b0f17"/>
+    <circle class="glow k3" cx="638" cy="0" r="120" fill="url(#g3)"/>
+    <g transform="skewX(-20)"><rect class="shine k3" x="408" width="56" height="128" fill="#fff" fill-opacity=".07"/></g>
+    <text class="l" x="470" y="34">RAM, IDLE</text>
+    <text x="470" y="84" fill="url(#n3)"><tspan class="n">~3</tspan><tspan class="u" dx="6">MB</tspan></text>
+    <text class="cap" x="470" y="108">media passes through RAM</text>
+  </g>
+  <rect x="448.5" y=".5" width="207" height="127" rx="17.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+
+  <g clip-path="url(#c4)">
+    <rect x="672" width="208" height="128" fill="#0b0f17"/>
+    <circle class="glow k4" cx="862" cy="0" r="120" fill="url(#g4)"/>
+    <g transform="skewX(-20)"><rect class="shine k4" x="632" width="56" height="128" fill="#fff" fill-opacity=".07"/></g>
+    <text class="l" x="694" y="34">OPEN PORTS</text>
+    <text x="694" y="84" fill="url(#n4)"><tspan class="n">0</tspan></text>
+    <text class="cap" x="694" y="108">outbound traffic only</text>
+  </g>
+  <rect x="672.5" y=".5" width="207" height="127" rx="17.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+</svg>
