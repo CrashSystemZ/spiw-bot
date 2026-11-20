@@ -103,7 +103,7 @@ impl Db {
         self.conn().execute("UPDATE posts SET caption = ?2 WHERE key = ?1", params![key, caption]).map(drop)
     }
 
-    pub fn set_media(&self, key: &str, media: Option<&FileRef>) -> rusqlite::Result<()> {
+    pub fn set_media(&self, key: &str, media: Option<&[FileRef]>) -> rusqlite::Result<()> {
         let json = media.and_then(|m| serde_json::to_string(m).ok());
         self.conn().execute("UPDATE posts SET media = ?2 WHERE key = ?1", params![key, json]).map(drop)
     }
@@ -149,7 +149,7 @@ fn read_post(row: &Row<'_>) -> rusqlite::Result<Option<Post>> {
         platform,
         url: row.get(2)?,
         caption: row.get(3)?,
-        // an unreadable reference is the same as no upload yet
+        // an unreadable value, such as the single file older versions stored, is the same as no upload yet
         media: media.and_then(|json| serde_json::from_str(&json).ok()),
     }))
 }
@@ -176,13 +176,17 @@ mod tests {
         assert!(db.post_by_alias("nope", 0).unwrap().is_none());
 
         let media = FileRef { kind: MediaKind::Video, id: 7, access_hash: -9, file_reference: vec![1, 2, 3] };
-        db.set_media("k1", Some(&media)).unwrap();
+        db.set_media("k1", Some(std::slice::from_ref(&media))).unwrap();
         db.set_caption("k1", "hello").unwrap();
         // refreshing the post keeps what was already uploaded
         db.save_post("k1", Platform::X, "https://x.com/a/status/1", &[], 5000).unwrap();
         let post = db.post("k1", 4000).unwrap().unwrap();
         assert_eq!(post.caption.as_deref(), Some("hello"));
-        assert_eq!(post.media.unwrap().file_reference, [1, 2, 3]);
+        assert_eq!(post.media.unwrap()[0].file_reference, [1, 2, 3]);
+
+        let single = serde_json::to_string(&media).unwrap();
+        db.conn().execute("UPDATE posts SET media = ?1", params![single]).unwrap();
+        assert!(db.post("k1", 0).unwrap().unwrap().media.is_none(), "a file stored by an older version is uploaded again");
 
         db.set_media("k1", None).unwrap();
         assert!(db.post("k1", 0).unwrap().unwrap().media.is_none());

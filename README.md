@@ -12,14 +12,16 @@ One static Rust binary. No files on disk, no `ffmpeg`, no `yt-dlp`.
 ## What it does
 
 Type a link in Telegram's inline mode in any chat and send the card. The bot
-replaces it with the actual video or photo, fetched through a
+replaces it with the actual video or photos, fetched through a
 [cobalt](https://github.com/imputnet/cobalt) instance.
 
 Supported: **TikTok**, **Instagram**, **X (Twitter)**. Any other link is
 rejected before any work is done.
 
-- The delivered message carries no buttons. An inline message holds one file,
-  so a post with several photos or videos is sent as its first one.
+- A post with several photos or videos gets ⬅️ ➡️ buttons to page through
+  them. A single video or photo carries no buttons at all.
+- A post the bot has already uploaded is offered as the file itself: it is
+  sent at once, with no card to replace.
 - X posts are sent with their text as the caption.
 - `/stats` shows how many videos were delivered.
 
@@ -40,9 +42,15 @@ inline query ──► link whitelist ──► canonical URL ──► "click t
 2. **Delivery.** cobalt resolves the post, the media is downloaded into RAM,
    its headers are read for size and duration, and it is uploaded to Telegram
    once. The message is then edited to show it.
-3. **Every later delivery of the same post** reuses the Telegram file: one API
-   call, no download, no upload. The references live in SQLite and survive
-   restarts.
+3. **Every later request for the same post** reuses the Telegram files: the
+   inline query is answered with the file itself, so sending it involves the
+   bot no further. The references live in SQLite and survive restarts. If
+   Telegram no longer accepts one, the card is offered again and the post is
+   uploaded anew.
+4. **Paging.** Each ⬅️ ➡️ button carries the post id and the index of the file
+   it shows; a press edits the message in one API call. Telegram accepts a
+   press only with data that is on a button of that very message, so a button
+   cannot be forged to show some other post.
 
 The bot talks MTProto directly (via [grammers](https://codeberg.org/Lonami/grammers)),
 so uploads are not limited to the Bot API's 50 MB.

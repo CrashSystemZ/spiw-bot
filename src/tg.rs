@@ -105,9 +105,14 @@ impl Tg {
         }
     }
 
-    /// Replaces the content of an inline message. `text` is the caption when `media` is given.
-    /// The placeholder's keyboard is dropped in the same call.
-    pub async fn edit(&self, id: &InlineId, text: &str, media: Option<&FileRef>) -> std::result::Result<(), InvocationError> {
+    /// Replaces the content of an inline message, keyboard included. `text` is the caption when `media` is given.
+    pub async fn edit(
+        &self,
+        id: &InlineId,
+        text: &str,
+        media: Option<&FileRef>,
+        reply_markup: Option<tl::enums::ReplyMarkup>,
+    ) -> std::result::Result<(), InvocationError> {
         // inline messages live in the datacenter of whoever sent them
         let dc = match id {
             InlineId::Id(id) => id.dc_id,
@@ -119,7 +124,7 @@ impl Tg {
             id: id.clone(),
             message: Some(text.to_owned()),
             media: media.map(input_media),
-            reply_markup: None,
+            reply_markup,
             entities: None,
             rich_message: None,
         };
@@ -177,6 +182,37 @@ fn input_media(file: &FileRef) -> tl::enums::InputMedia {
         }
         .into()
     }
+}
+
+/// An inline result that sends a stored file itself, so there is no placeholder to replace afterwards.
+pub fn file_result(
+    id: String,
+    title: &str,
+    file: &FileRef,
+    caption: &str,
+    reply_markup: Option<tl::enums::ReplyMarkup>,
+) -> tl::enums::InputBotInlineResult {
+    let send_message = tl::types::InputBotInlineMessageMediaAuto { invert_media: false, message: caption.to_owned(), entities: None, reply_markup }.into();
+    let FileRef { kind, id: file, access_hash, file_reference } = file.clone();
+    let r#type = match kind {
+        MediaKind::Photo => {
+            let photo = tl::types::InputPhoto { id: file, access_hash, file_reference }.into();
+            return tl::types::InputBotInlineResultPhoto { id, r#type: "photo".into(), photo, send_message }.into();
+        }
+        MediaKind::Video => "video",
+        MediaKind::Animation => "gif",
+        MediaKind::Audio => "audio",
+        MediaKind::Document => "file",
+    };
+    tl::types::InputBotInlineResultDocument {
+        id,
+        r#type: r#type.into(),
+        title: Some(title.to_owned()),
+        description: None,
+        document: tl::types::InputDocument { id: file, access_hash, file_reference }.into(),
+        send_message,
+    }
+    .into()
 }
 
 /// Telegram no longer accepts a stored file reference; the file has to be uploaded again.

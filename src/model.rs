@@ -61,8 +61,8 @@ pub struct Post {
     pub url: String,
     /// Ready-to-send caption. `None` = not fetched yet, empty = the post has no text.
     pub caption: Option<String>,
-    /// The post's file on Telegram, once it has been uploaded.
-    pub media: Option<FileRef>,
+    /// The post's files on Telegram, in order, once they have been uploaded.
+    pub media: Option<Vec<FileRef>>,
 }
 
 /// Stable id of a post. Platform is mixed in so numeric ids of different platforms never collide.

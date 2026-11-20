@@ -21,6 +21,7 @@ use crate::{
 
 /// An instance that rejected our credentials is skipped for this long.
 const BAN: Duration = Duration::from_secs(3600);
+const MAX_PICKER_ITEMS: usize = 50;
 const BUDGET_UNIT: u64 = 64 * 1024;
 const BUDGET_STEP: u64 = 4 << 20;
 const BUDGET_WAIT: Duration = Duration::from_secs(60);
@@ -38,7 +39,7 @@ pub enum Hint {
     Unknown,
 }
 
-/// Where to download a post's file from.
+/// Where to download one file of a post from.
 pub struct Resolved {
     pub url: Url,
     pub file_name: Option<String>,
@@ -103,7 +104,7 @@ pub struct Downloaded {
 
 enum Outcome {
     /// The instance answered about the content; asking another one would not help.
-    Done(Result<Resolved>),
+    Done(Result<Vec<Resolved>>),
     Next { code: String, ban: bool },
 }
 
@@ -123,7 +124,8 @@ impl Cobalt {
         Ok(Self { api: net::endpoint_client()?, public, endpoints, banned_until, timeout })
     }
 
-    pub async fn resolve(&self, url: &str) -> Result<Resolved> {
+    /// The files of a post, in order. Never empty.
+    pub async fn resolve(&self, url: &str) -> Result<Vec<Resolved>> {
         let mut last = Error::Unavailable("no cobalt instance available".into());
         for (index, endpoint) in self.endpoints.iter().enumerate() {
             if self.is_banned(index) {
@@ -272,19 +274,22 @@ impl Cobalt {
     }
 }
 
-fn resolved(response: ApiResponse, endpoint: &Endpoint) -> Result<Resolved> {
-    let found = match response {
+fn resolved(response: ApiResponse, endpoint: &Endpoint) -> Result<Vec<Resolved>> {
+    let files: Vec<_> = match response {
         ApiResponse::Tunnel { url, filename } | ApiResponse::Redirect { url, filename } => {
-            media_url(&url, endpoint).map(|url| Resolved { url, file_name: filename, hint: None })
+            media_url(&url, endpoint).map(|url| Resolved { url, file_name: filename, hint: None }).into_iter().collect()
         }
-        // An inline message holds one file and has no buttons to page with,
-        // so a post with several files is sent as its first one.
         ApiResponse::Picker { picker } => picker
             .into_iter()
-            .find_map(|item| Some(Resolved { url: media_url(&item.url, endpoint)?, file_name: None, hint: Some(item.hint) })),
-        ApiResponse::LocalProcessing {} | ApiResponse::Error { .. } => None,
+            .filter_map(|item| Some(Resolved { url: media_url(&item.url, endpoint)?, file_name: None, hint: Some(item.hint) }))
+            .take(MAX_PICKER_ITEMS)
+            .collect(),
+        ApiResponse::LocalProcessing {} | ApiResponse::Error { .. } => vec![],
     };
-    found.ok_or_else(|| Error::Unavailable("cobalt returned an unusable link".into()))
+    if files.is_empty() {
+        return Err(Error::Unavailable("cobalt returned an unusable link".into()));
+    }
+    Ok(files)
 }
 
 /// A link handed out by `endpoint`. An instance configured with an internal name for itself
@@ -331,22 +336,23 @@ mod tests {
         Endpoint { base: Url::parse(base).unwrap(), auth: None }
     }
 
-    fn parse(json: &str) -> Result<Resolved> {
+    fn parse(json: &str) -> Result<Vec<Resolved>> {
         resolved(serde_json::from_str(json).unwrap(), &endpoint("https://co.example/"))
     }
 
     #[test]
     fn parses_api_responses() {
         let single = parse(r#"{"status":"tunnel","url":"https://co.example/tunnel?id=1","filename":"a.mp4"}"#).unwrap();
+        let [single] = single.as_slice() else { panic!("expected one file") };
         assert_eq!((single.url.as_str(), single.file_name.as_deref(), single.hint), ("https://co.example/tunnel?id=1", Some("a.mp4"), None));
 
-        // the first usable item stands for the whole post
-        let first = parse(
+        let several = parse(
             r#"{"status":"picker","audio":"https://co.example/a","audioFilename":"a.mp3",
                 "picker":[{"type":"gif","url":"ftp://x/1"},{"type":"photo","url":"https://cdn.example/2.jpg"},{"type":"video","url":"https://cdn.example/3"}]}"#,
         )
         .unwrap();
-        assert_eq!((first.url.as_str(), first.hint), ("https://cdn.example/2.jpg", Some(Hint::Photo)));
+        let found: Vec<_> = several.iter().map(|file| (file.url.as_str(), file.hint)).collect();
+        assert_eq!(found, [("https://cdn.example/2.jpg", Some(Hint::Photo)), ("https://cdn.example/3", Some(Hint::Video))], "in order, non-http link dropped");
         assert!(parse(r#"{"status":"picker","picker":[]}"#).is_err());
 
         let future: ApiItem = serde_json::from_str(r#"{"type":"hologram","url":"https://cdn.example/4"}"#).unwrap();
