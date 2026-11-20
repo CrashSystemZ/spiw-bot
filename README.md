@@ -12,16 +12,15 @@ One static Rust binary. No files on disk, no `ffmpeg`, no `yt-dlp`.
 ## What it does
 
 Type a link in Telegram's inline mode in any chat and send the card. The bot
-replaces it with the actual video, photo carousel or audio, fetched through a
+replaces it with the actual video or photo, fetched through a
 [cobalt](https://github.com/imputnet/cobalt) instance.
 
 Supported: **TikTok**, **Instagram**, **X (Twitter)**. Any other link is
 rejected before any work is done.
 
-- Photo carousels get ⬅️ ➡️ navigation and a 🎵 switch when the post has a
-  soundtrack. A single video or photo carries no buttons at all.
+- The delivered message carries no buttons. An inline message holds one file,
+  so a post with several photos or videos is sent as its first one.
 - X posts are sent with their text as the caption.
-- A failed delivery shows a 🔄 retry button.
 - `/stats` shows how many videos were delivered.
 
 ## How it works
@@ -35,7 +34,9 @@ inline query ──► link whitelist ──► canonical URL ──► "click t
 
 1. **Inline query.** The link is checked against the platform whitelist and
    canonicalised (short links are followed). The card's id is a hash of the
-   post, so nothing else has to be remembered.
+   post, so nothing else has to be remembered. Telegram reports which message
+   was sent only if it has a keyboard, so the card carries one link button
+   until the media replaces it.
 2. **Delivery.** cobalt resolves the post, the media is downloaded into RAM,
    its headers are read for size and duration, and it is uploaded to Telegram
    once. The message is then edited to show it.
@@ -65,8 +66,6 @@ uninteresting to break into.
   through an HTTP client that refuses private and loopback addresses, also
   after DNS resolution and redirects. API keys are only ever sent back to the
   instance they belong to.
-- **Signed buttons.** Callback data carries an HMAC bound to the message it
-  was issued for; it cannot be forged or replayed on another message.
 - **Bounded memory.** One global budget caps the media bytes held in RAM, and
   every body read from the network has a size limit.
 - `unsafe` is forbidden in the crate.
@@ -110,7 +109,6 @@ In @BotFather enable inline mode (`/setinline`) and set inline feedback to
 | `COBALT_REQUEST_TIMEOUT_MS` | `8000` | Time allowed for one cobalt API call |
 | `REHYDRATE_TTL_SECONDS` | `432000` | How long a post stays known after it was last requested |
 | `MAX_CONCURRENT_JOBS` | `32` | Posts being fetched at once |
-| `MAX_FETCHES_PER_JOB` | `4` | Parallel downloads within one carousel |
 | `MEDIA_BUFFER_BUDGET_BYTES` | 2 GiB | Media bytes held in RAM across all jobs |
 | `MAX_MEDIA_ITEM_BYTES` | 2 GiB | Largest single file |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug`, `trace` |

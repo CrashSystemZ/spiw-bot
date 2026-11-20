@@ -21,7 +21,6 @@ use crate::{
 
 /// An instance that rejected our credentials is skipped for this long.
 const BAN: Duration = Duration::from_secs(3600);
-const MAX_PICKER_ITEMS: usize = 50;
 const BUDGET_UNIT: u64 = 64 * 1024;
 const BUDGET_STEP: u64 = 4 << 20;
 const BUDGET_WAIT: Duration = Duration::from_secs(60);
@@ -34,21 +33,17 @@ pub enum Hint {
     Photo,
     Video,
     Gif,
-    #[serde(skip)]
-    Audio,
     /// A picker item type this build does not know; the file itself decides.
     #[serde(other)]
     Unknown,
 }
 
-pub struct Item {
+/// Where to download a post's file from.
+pub struct Resolved {
     pub url: Url,
-    pub hint: Hint,
-}
-
-pub enum Resolved {
-    Single { url: Url, file_name: Option<String> },
-    Picker { items: Vec<Item>, audio: Option<(Url, Option<String>)> },
+    pub file_name: Option<String>,
+    /// What cobalt says the file is, when it says.
+    pub hint: Option<Hint>,
 }
 
 #[derive(Deserialize)]
@@ -56,8 +51,7 @@ pub enum Resolved {
 enum ApiResponse {
     Tunnel { url: String, filename: Option<String> },
     Redirect { url: String, filename: Option<String> },
-    #[serde(rename_all = "camelCase")]
-    Picker { picker: Vec<ApiItem>, audio: Option<String>, audio_filename: Option<String> },
+    Picker { picker: Vec<ApiItem> },
     LocalProcessing {},
     Error { error: ApiError },
 }
@@ -279,25 +273,18 @@ impl Cobalt {
 }
 
 fn resolved(response: ApiResponse, endpoint: &Endpoint) -> Result<Resolved> {
-    let bad_link = || Error::Unavailable("cobalt returned an unusable link".into());
-    match response {
+    let found = match response {
         ApiResponse::Tunnel { url, filename } | ApiResponse::Redirect { url, filename } => {
-            Ok(Resolved::Single { url: media_url(&url, endpoint).ok_or_else(bad_link)?, file_name: filename })
+            media_url(&url, endpoint).map(|url| Resolved { url, file_name: filename, hint: None })
         }
-        ApiResponse::Picker { picker, audio, audio_filename } => {
-            let items: Vec<_> = picker
-                .into_iter()
-                .take(MAX_PICKER_ITEMS)
-                .filter_map(|item| Some(Item { url: media_url(&item.url, endpoint)?, hint: item.hint }))
-                .collect();
-            if items.is_empty() {
-                return Err(bad_link());
-            }
-            let audio = audio.and_then(|url| Some((media_url(&url, endpoint)?, audio_filename)));
-            Ok(Resolved::Picker { items, audio })
-        }
-        ApiResponse::LocalProcessing {} | ApiResponse::Error { .. } => Err(bad_link()),
-    }
+        // An inline message holds one file and has no buttons to page with,
+        // so a post with several files is sent as its first one.
+        ApiResponse::Picker { picker } => picker
+            .into_iter()
+            .find_map(|item| Some(Resolved { url: media_url(&item.url, endpoint)?, file_name: None, hint: Some(item.hint) })),
+        ApiResponse::LocalProcessing {} | ApiResponse::Error { .. } => None,
+    };
+    found.ok_or_else(|| Error::Unavailable("cobalt returned an unusable link".into()))
 }
 
 /// A link handed out by `endpoint`. An instance configured with an internal name for itself
@@ -350,21 +337,20 @@ mod tests {
 
     #[test]
     fn parses_api_responses() {
-        let Ok(Resolved::Single { url, file_name }) = parse(r#"{"status":"tunnel","url":"https://co.example/tunnel?id=1","filename":"a.mp4"}"#) else {
-            panic!("expected single")
-        };
-        assert_eq!((url.as_str(), file_name.as_deref()), ("https://co.example/tunnel?id=1", Some("a.mp4")));
+        let single = parse(r#"{"status":"tunnel","url":"https://co.example/tunnel?id=1","filename":"a.mp4"}"#).unwrap();
+        assert_eq!((single.url.as_str(), single.file_name.as_deref(), single.hint), ("https://co.example/tunnel?id=1", Some("a.mp4"), None));
 
-        let Ok(Resolved::Picker { items, audio }) = parse(
+        // the first usable item stands for the whole post
+        let first = parse(
             r#"{"status":"picker","audio":"https://co.example/a","audioFilename":"a.mp3",
-                "picker":[{"type":"photo","url":"https://cdn.example/1.jpg"},{"type":"gif","url":"ftp://x/2"},{"type":"gif","url":"https://cdn.example/3"}]}"#,
-        ) else {
-            panic!("expected picker")
-        };
-        assert_eq!(items.iter().map(|i| i.hint).collect::<Vec<_>>(), [Hint::Photo, Hint::Gif], "non-http link dropped");
+                "picker":[{"type":"gif","url":"ftp://x/1"},{"type":"photo","url":"https://cdn.example/2.jpg"},{"type":"video","url":"https://cdn.example/3"}]}"#,
+        )
+        .unwrap();
+        assert_eq!((first.url.as_str(), first.hint), ("https://cdn.example/2.jpg", Some(Hint::Photo)));
+        assert!(parse(r#"{"status":"picker","picker":[]}"#).is_err());
+
         let future: ApiItem = serde_json::from_str(r#"{"type":"hologram","url":"https://cdn.example/4"}"#).unwrap();
         assert_eq!(future.hint, Hint::Unknown);
-        assert_eq!(audio.unwrap().1.as_deref(), Some("a.mp3"));
 
         assert!(serde_json::from_str::<ApiResponse>(r#"{"status":"error","error":{"code":"error.api.fetch.fail"}}"#).is_ok());
         assert!(serde_json::from_str::<ApiResponse>(r#"{"status":"local-processing","type":"merge","tunnel":[]}"#).is_ok());

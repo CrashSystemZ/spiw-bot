@@ -5,7 +5,7 @@ use std::{
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use crate::model::{Media, Platform, Post};
+use crate::model::{FileRef, Platform, Post};
 
 // `delivery_events` keeps the layout of the TypeScript bot so its stats carry over;
 // that bot's other tables were caches and are dropped.
@@ -103,7 +103,7 @@ impl Db {
         self.conn().execute("UPDATE posts SET caption = ?2 WHERE key = ?1", params![key, caption]).map(drop)
     }
 
-    pub fn set_media(&self, key: &str, media: Option<&Media>) -> rusqlite::Result<()> {
+    pub fn set_media(&self, key: &str, media: Option<&FileRef>) -> rusqlite::Result<()> {
         let json = media.and_then(|m| serde_json::to_string(m).ok());
         self.conn().execute("UPDATE posts SET media = ?2 WHERE key = ?1", params![key, json]).map(drop)
     }
@@ -157,7 +157,7 @@ fn read_post(row: &Row<'_>) -> rusqlite::Result<Option<Post>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{FileRef, MediaKind};
+    use crate::model::MediaKind;
 
     fn db() -> Db {
         let conn = Connection::open_in_memory().unwrap();
@@ -175,14 +175,14 @@ mod tests {
         assert!(db.post("k1", 1001).unwrap().is_none(), "older than the cutoff");
         assert!(db.post_by_alias("nope", 0).unwrap().is_none());
 
-        let media = Media { items: vec![FileRef { kind: MediaKind::Video, id: 7, access_hash: -9, file_reference: vec![1, 2, 3] }], audio: None };
+        let media = FileRef { kind: MediaKind::Video, id: 7, access_hash: -9, file_reference: vec![1, 2, 3] };
         db.set_media("k1", Some(&media)).unwrap();
         db.set_caption("k1", "hello").unwrap();
         // refreshing the post keeps what was already uploaded
         db.save_post("k1", Platform::X, "https://x.com/a/status/1", &[], 5000).unwrap();
         let post = db.post("k1", 4000).unwrap().unwrap();
         assert_eq!(post.caption.as_deref(), Some("hello"));
-        assert_eq!(post.media.unwrap().items[0].file_reference, [1, 2, 3]);
+        assert_eq!(post.media.unwrap().file_reference, [1, 2, 3]);
 
         db.set_media("k1", None).unwrap();
         assert!(db.post("k1", 0).unwrap().unwrap().media.is_none());

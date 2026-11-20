@@ -1887,7 +1887,6 @@ version = "3.0.0"
 dependencies = [
  "bytes",
  "grammers-client",
- "hmac",
  "imagesize",
  "mp3-duration",
  "reqwest",

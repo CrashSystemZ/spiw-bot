@@ -51,12 +51,6 @@ pub struct FileRef {
     pub file_reference: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Media {
-    pub items: Vec<FileRef>,
-    pub audio: Option<FileRef>,
-}
-
 /// Everything needed to deliver a post, as stored in the database.
 #[derive(Clone, Debug)]
 pub struct Post {
@@ -67,7 +61,8 @@ pub struct Post {
     pub url: String,
     /// Ready-to-send caption. `None` = not fetched yet, empty = the post has no text.
     pub caption: Option<String>,
-    pub media: Option<Media>,
+    /// The post's file on Telegram, once it has been uploaded.
+    pub media: Option<FileRef>,
 }
 
 /// Stable id of a post. Platform is mixed in so numeric ids of different platforms never collide.

@@ -106,13 +106,8 @@ impl Tg {
     }
 
     /// Replaces the content of an inline message. `text` is the caption when `media` is given.
-    pub async fn edit(
-        &self,
-        id: &InlineId,
-        text: &str,
-        media: Option<&FileRef>,
-        reply_markup: Option<tl::enums::ReplyMarkup>,
-    ) -> std::result::Result<(), InvocationError> {
+    /// The placeholder's keyboard is dropped in the same call.
+    pub async fn edit(&self, id: &InlineId, text: &str, media: Option<&FileRef>) -> std::result::Result<(), InvocationError> {
         // inline messages live in the datacenter of whoever sent them
         let dc = match id {
             InlineId::Id(id) => id.dc_id,
@@ -124,7 +119,7 @@ impl Tg {
             id: id.clone(),
             message: Some(text.to_owned()),
             media: media.map(input_media),
-            reply_markup,
+            reply_markup: None,
             entities: None,
             rich_message: None,
         };

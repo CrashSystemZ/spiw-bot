@@ -1,8 +1,5 @@
 {
     "loading": "Cooking...",
-    "carouselExpired": "Carousel expired 😴",
-    "retryExpired": "Retry expired 🙈",
-    "retryStarted": "Retrying request 🔄",
     "unsupportedLink": "Link not supported 😩",
     "mediaTooLarge": "This media is too large 👀",
     "mediaUnavailable": "Failed to get media 😵‍💫",
