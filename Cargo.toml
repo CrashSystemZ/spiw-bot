@@ -1,0 +1,40 @@
+[package]
+name = "spiw-bot"
+version = "3.0.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+publish = false
+
+[dependencies]
+# MTProto client. No default features: no session file, no html/markdown parsers.
+grammers-client = { version = "0.12", default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "json", "gzip"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+hmac = "0.13"
+bytes = "1"
+url = "2"
+imagesize = "0.15"
+mp3-duration = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

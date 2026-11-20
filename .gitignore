@@ -24,3 +24,9 @@ Dockerfile.dev
 
 # Local-only agent docs (operator guide, never published)
 AGENTS.md
+
+# Rust
+/target/
+
+# Deployment secrets
+keys.json

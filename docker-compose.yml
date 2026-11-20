@@ -1,42 +1,98 @@
+# Jailed deployment: no published ports, traffic only to the public internet,
+# nothing can reach the host, its private networks or other containers. See fw/fw.sh.
+name: spiw
+
+x-jailed: &jailed
+  network_mode: "service:fw"
+  depends_on:
+    fw:
+      condition: service_healthy
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 256
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
 services:
-  cobalt:
-    image: ghcr.io/imputnet/cobalt:latest
-    container_name: spiw-cobalt
+  # Owns the network namespace the other two share, and locks it down before they start.
+  fw:
+    build: ./fw
+    image: spiw-fw:latest
+    container_name: spiw-fw
+    init: true
+    read_only: true
+    tmpfs: ["/run:size=1m"]
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN]
+    security_opt: ["no-new-privileges:true"]
     environment:
-      API_URL: http://cobalt:9000/
-    ports:
-      - "${COBALT_HOST_PORT:-9000}:9000"
+      # the host's own public address is not covered by the private ranges in fw.sh
+      BLOCK_EXTRA: "${HOST_PUBLIC_IP:?set HOST_PUBLIC_IP in .env}"
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 1
+    # public resolvers, so DNS never touches the host's resolver
+    dns: [1.1.1.1, 9.9.9.9]
+    networks: [jail]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /run/fw.ready && iptables -C OUTPUT -d 10.0.0.0/8 -j REJECT"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      start_interval: 1s
+    mem_limit: 32m
+    pids_limit: 16
     restart: unless-stopped
 
+  # Private cobalt instance: loopback only, API key required.
+  # https://github.com/imputnet/cobalt/blob/main/docs/protect-an-instance.md
+  cobalt:
+    <<: *jailed
+    image: ghcr.io/imputnet/cobalt:11
+    container_name: spiw-cobalt
+    init: true
+    user: "10002:10002"
+    environment:
+      API_URL: http://127.0.0.1:9000/
+      API_LISTEN_ADDRESS: 127.0.0.1
+      API_KEY_URL: file:///keys.json
+      API_AUTH_REQUIRED: 1
+      CORS_WILDCARD: 0
+      # tunnels are limited per client address, and the only client is the bot
+      TUNNEL_RATELIMIT_MAX: 10000
+      # everything the bot has no use for
+      DISABLED_SERVICES: bilibili,bsky,dailymotion,facebook,loom,newgrounds,ok,pinterest,reddit,rutube,snapchat,soundcloud,streamable,tumblr,twitch,vimeo,vk,youtube
+    volumes:
+      - ./keys.json:/keys.json:ro
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2
+
   bot:
+    <<: *jailed
+    build: .
     image: spiw-bot:latest
     container_name: spiw-bot
     depends_on:
-      - cobalt
+      fw:
+        condition: service_healthy
+      cobalt:
+        condition: service_started
+    user: "10001:10001"
+    env_file: .env
     environment:
-      BOT_TOKEN: ${BOT_TOKEN}
-      TG_API_ID: ${TG_API_ID}
-      TG_API_HASH: ${TG_API_HASH}
-      DB_PATH: ${DB_PATH:-/app/data/spiw.sqlite}
-      SESSION_PATH: ${SESSION_PATH:-/tmp/mtcute.session}
-      COBALT_BASE_URL: http://cobalt:9000
-      COBALT_AUTHORIZATION: ${COBALT_AUTHORIZATION:-}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      INLINE_RESOLVE_TIMEOUT_MS: ${INLINE_RESOLVE_TIMEOUT_MS:-5000}
-      REQUEST_TTL_SECONDS: ${REQUEST_TTL_SECONDS:-5400}
-      REHYDRATE_TTL_SECONDS: ${REHYDRATE_TTL_SECONDS:-432000}
-      METADATA_TTL_SECONDS: ${METADATA_TTL_SECONDS:-432000}
-      UI_STATE_TTL_SECONDS: ${UI_STATE_TTL_SECONDS:-432000}
-      MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-32}
-      MAX_FETCHES_PER_JOB: ${MAX_FETCHES_PER_JOB:-4}
-      MEDIA_BUFFER_BUDGET_BYTES: ${MEDIA_BUFFER_BUDGET_BYTES:-2147483648}
-      MAX_MEDIA_ITEM_BYTES: ${MAX_MEDIA_ITEM_BYTES:-2147483648}
+      DB_PATH: /data/spiw.sqlite
+      COBALT_BASE_URL: http://127.0.0.1:9000
     volumes:
-      - ./data:/app/data
-    read_only: true
-    tmpfs:
-      - /tmp:size=256m
-    security_opt:
-      - no-new-privileges:true
-    stop_grace_period: 15s
-    restart: unless-stopped
+      - ./data:/data
+    # media passes through RAM: MEDIA_BUFFER_BUDGET_BYTES (2 GiB by default) plus headroom
+    mem_limit: 3g
+    memswap_limit: 3g
+    cpus: 2
+    stop_grace_period: 10s
+
+networks:
+  jail:
+    driver: bridge

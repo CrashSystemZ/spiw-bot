@@ -1,26 +1,11 @@
-FROM node:22-bookworm-slim AS build
+# The binary is cross-compiled on the build machine, not in Docker:
+#   cargo zigbuild --release --target x86_64-unknown-linux-musl
+# The image holds that one static binary and the CA bundle. No shell, no libc, no package manager.
+FROM alpine:3 AS certs
+RUN apk add --no-cache ca-certificates
 
-WORKDIR /app
-
-COPY package.json package-lock.json tsconfig.json ./
-RUN npm ci
-
-COPY src ./src
-COPY resources ./resources
-RUN npm run build
-
-RUN npm prune --omit=dev
-
-FROM node:22-bookworm-slim AS runtime
-
-ENV NODE_ENV=production
-WORKDIR /app
-
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/resources ./resources
-COPY package.json ./
-
-RUN mkdir -p /app/data
-
-CMD ["node", "dist/index.js"]
+FROM scratch
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY target/x86_64-unknown-linux-musl/release/spiw-bot /spiw-bot
+USER 10001:10001
+ENTRYPOINT ["/spiw-bot"]
