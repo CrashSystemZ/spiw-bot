@@ -2,25 +2,11 @@
 
 <img src=".github/readme/hero.svg" alt="spiw-bot. Paste a link. Send the video." width="100%">
 
-<br><br>
-
-[![Rust 2024](https://img.shields.io/badge/Rust-2024_edition-f7632a?style=for-the-badge&logo=rust&logoColor=white)](Cargo.toml)
-[![Telegram MTProto](https://img.shields.io/badge/Telegram-MTProto-2aabee?style=for-the-badge&logo=telegram&logoColor=white)](https://core.telegram.org/mtproto)
-[![Docker FROM scratch](https://img.shields.io/badge/Docker-FROM_scratch-0b0f17?style=for-the-badge&logo=docker&logoColor=2aabee)](Dockerfile)
-[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-2ea043?style=for-the-badge)](Cargo.toml)
-[![MIT license](https://img.shields.io/badge/license-MIT-8b98a9?style=for-the-badge)](LICENSE)
-
 ### Turn a TikTok, Instagram or X link into the real video, right in the chat you are typing in.
-
-One static Rust binary. No files on disk, no `ffmpeg`, no `yt-dlp`.
-
-[What it does](#what-it-does) · [How it works](#how-it-works) · [Security](#security-model) · [Quick start](#quick-start) · [Configuration](#configuration)
 
 </div>
 
-<br>
-
-<img src=".github/readme/demo.svg" alt="A chat: the bot's name and a link are typed, the card that appears is tapped, it is sent as a placeholder and turns into the post, and the arrows under it page through the post." width="100%">
+<img src=".github/readme/demo.svg" alt="A Telegram chat: the bot's name and a link are typed, the card that appears is tapped, it is sent as a placeholder and turns into the post, and the arrows under it page through the post." width="100%">
 
 <br><br>
 
@@ -28,37 +14,27 @@ One static Rust binary. No files on disk, no `ffmpeg`, no `yt-dlp`.
 
 ## What it does
 
-Type the bot's name and a link in any Telegram chat, then send the card that
-appears. The bot replaces it with the actual video or photos, fetched through a
-[cobalt](https://github.com/imputnet/cobalt) instance.
-
-Supported: **TikTok**, **Instagram**, **X (Twitter)**. Any other link is
-rejected before any work is done.
-
 <table>
 <tr>
 <td width="33%" valign="top">
 
 **⚡ Instant repeats**
 
-A post the bot has already uploaded is offered as the file itself. It is sent
-at once, with no card to replace.
+A post seen before is sent as the file itself, at once.
 
 </td>
 <td width="33%" valign="top">
 
 **🎞️ Whole posts**
 
-A post with several photos or videos gets ⬅️ ➡️ buttons to page through them.
-A single video or photo carries no buttons at all.
+Several photos or videos get ⬅️ ➡️ buttons.
 
 </td>
 <td width="33%" valign="top">
 
-**📦 Past the 50 MB limit**
+**📦 Past 50 MB**
 
-The bot speaks MTProto directly, so uploads are not held to the Bot API's
-50 MB.
+MTProto directly, not the Bot API.
 
 </td>
 </tr>
@@ -67,22 +43,21 @@ The bot speaks MTProto directly, so uploads are not held to the Bot API's
 
 **🧠 Nothing on disk**
 
-Media passes through RAM under one global budget. SQLite keeps Telegram file
-ids, never the files.
+Media only passes through RAM.
 
 </td>
 <td valign="top">
 
 **📝 Captions for X**
 
-X posts are sent with their text as the caption.
+X posts keep their text.
 
 </td>
 <td valign="top">
 
 **📊 `/stats`**
 
-Shows how many videos were delivered, in the last day and in total.
+Counts the videos delivered.
 
 </td>
 </tr>
@@ -92,14 +67,18 @@ Shows how many videos were delivered, in the last day and in total.
 
 <img src=".github/readme/flow.svg" alt="Inline query, whitelist and card happen while you type. After the card is sent: cobalt, RAM, Telegram. A post seen before is answered with the file itself." width="100%">
 
+<details>
+<summary>Step by step</summary>
+
 1. **Inline query.** The link is checked against the platform whitelist and
    canonicalised (short links are followed). The card's id is a hash of the
    post, so nothing else has to be remembered. Telegram reports which message
    was sent only if it has a keyboard, so the card carries one link button
    until the media replaces it.
-2. **Delivery.** cobalt resolves the post, the media is downloaded into RAM,
-   its headers are read for size and duration, and it is uploaded to Telegram
-   once. The message is then edited to show it.
+2. **Delivery.** [cobalt](https://github.com/imputnet/cobalt) resolves the
+   post, the media is downloaded into RAM, its headers are read for size and
+   duration, and it is uploaded to Telegram once. The message is then edited to
+   show it.
 3. **Every later request for the same post** reuses the Telegram files: the
    inline query is answered with the file itself, so sending it involves the
    bot no further. The references live in SQLite and survive restarts. If
@@ -110,15 +89,14 @@ Shows how many videos were delivered, in the last day and in total.
    press only with data that is on a button of that very message, so a button
    cannot be forged to show some other post.
 
-The bot talks MTProto through [grammers](https://codeberg.org/Lonami/grammers),
-not through the Bot API.
+</details>
 
 ## Security model
 
-The bot handles links and files from strangers, so it is built to be
-uninteresting to break into.
-
 <img src=".github/readme/sandbox.svg" alt="The bot and cobalt share one network namespace behind a firewall sidecar. Host services, private networks, cloud metadata and the host's own address are unreachable. Only outbound traffic to the public internet is allowed." width="100%">
+
+<details>
+<summary>What is locked down</summary>
 
 - **Jail.** `docker-compose.yml` runs the bot and cobalt in one network
   namespace behind a firewall sidecar ([fw/fw.sh](fw/fw.sh)): no published
@@ -138,9 +116,11 @@ uninteresting to break into.
   every body read from the network has a size limit.
 - `unsafe` is forbidden in the crate.
 
+</details>
+
 ## Quick start
 
-Build on your machine (any OS; the target is a static Linux binary):
+Build anywhere; the target is a static Linux binary:
 
 ```bash
 cargo install cargo-zigbuild        # once; needs zig
@@ -161,10 +141,11 @@ chown 10002 keys.json && chmod 400 keys.json
 docker compose up -d
 ```
 
-In @BotFather enable inline mode (`/setinline`) and set inline feedback to
-100% (`/setinlinefeedback`), otherwise the bot is never told that a card was sent.
+In @BotFather turn on inline mode (`/setinline`) and set inline feedback to
+100% (`/setinlinefeedback`), or the bot is never told that a card was sent.
 
-## Configuration
+<details>
+<summary>Configuration</summary>
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -184,19 +165,19 @@ In @BotFather enable inline mode (`/setinline`) and set inline feedback to
 User-facing strings are in [resources/messages.json](resources/messages.json)
 and are compiled into the binary.
 
-### Other cobalt instances
-
-Our own instance is always asked first. When it cannot fetch a post (for
-example because the platform rate-limits the server's IP), the bot moves on to
-`COBALT_EXTRA_ENDPOINTS` in order. An instance that rejects our credentials is
-skipped for an hour.
-
-Public cobalt instances are bot-protected and, per cobalt's
+**Other cobalt instances.** Our own instance is always asked first. When it
+cannot fetch a post (for example because the platform rate-limits the server's
+IP), the bot moves on to `COBALT_EXTRA_ENDPOINTS` in order. An instance that
+rejects our credentials is skipped for an hour. Public cobalt instances are
+bot-protected and, per cobalt's
 [API docs](https://github.com/imputnet/cobalt/blob/main/docs/api.md), not meant
 for other projects without their owner's permission. List only instances you
 were given access to.
 
-## Layout
+</details>
+
+<details>
+<summary>Source layout</summary>
 
 ```
 src/
@@ -211,14 +192,9 @@ src/
 └── url.rs, config.rs, model.rs, error.rs
 ```
 
-## Built on
-
-[grammers](https://codeberg.org/Lonami/grammers) for MTProto ·
-[cobalt](https://github.com/imputnet/cobalt) for resolving posts ·
-[tokio](https://tokio.rs) · [reqwest](https://github.com/seanmonstar/reqwest) with rustls ·
-[rusqlite](https://github.com/rusqlite/rusqlite)
+</details>
 
 <div align="center">
 <br>
-<sub>MIT licensed · written in Rust 🦀</sub>
+<sub>Built on <a href="https://codeberg.org/Lonami/grammers">grammers</a> and <a href="https://github.com/imputnet/cobalt">cobalt</a> · MIT licensed · written in Rust 🦀</sub>
 </div>
