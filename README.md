@@ -6,7 +6,7 @@
 
 </div>
 
-<img src=".github/readme/demo.svg" alt="A Telegram chat: the bot's name and a link are typed, the card that appears is tapped, it is sent as a placeholder and turns into the post, and the arrows under it page through the post." width="100%">
+<img src=".github/readme/demo.svg" alt="A Telegram chat on a phone: the bot's name and a link are typed, the card that appears is tapped, it is sent as a placeholder and turns into the post, and the arrows under it page through the post." width="100%">
 
 <br><br>
 
