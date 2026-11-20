@@ -103,7 +103,7 @@
       <g class="a cook">
         <rect x="396" y="412" width="202" height="54" rx="17" fill="#3a6f9c"/>
         <path d="M586 466h19c-5-2-7-7-7-14h-12Z" fill="#3a6f9c"/>
-        <text x="410" y="432" font-size="12" font-weight="600" fill="#b5ddff">via @spiw_bot</text>
+        <text x="410" y="432" font-size="12" font-weight="600" fill="#b5ddff">via @spiwbot</text>
         <circle class="spin" cx="417" cy="449" r="6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="22 16"/>
         <text x="431" y="454" font-size="14" fill="#fff">Cooking...</text>
         <text x="570" y="458" font-size="10.5" fill="#b9d4ea" text-anchor="end">21:05</text>
@@ -138,8 +138,8 @@
             <g fill="#ffd166"><rect x="71" y="126" width="5" height="6"/><rect x="82" y="126" width="5" height="6"/><rect x="71" y="140" width="5" height="6"/><rect x="165" y="100" width="5" height="6"/><rect x="175" y="116" width="5" height="6"/><rect x="165" y="132" width="5" height="6"/><rect x="31" y="150" width="5" height="6"/><rect x="121" y="148" width="5" height="6"/></g>
           </g>
         </g>
-        <rect x="404" y="254" width="94" height="20" rx="10" fill="#000" fill-opacity=".45"/>
-        <text x="451" y="268" font-size="11" font-weight="600" fill="#fff" text-anchor="middle">via @spiw_bot</text>
+        <rect x="404" y="254" width="88" height="20" rx="10" fill="#000" fill-opacity=".45"/>
+        <text x="448" y="268" font-size="11" font-weight="600" fill="#fff" text-anchor="middle">via @spiwbot</text>
         <rect x="528" y="440" width="62" height="18" rx="9" fill="#000" fill-opacity=".45"/>
         <text x="565" y="453" font-size="10.5" fill="#fff" text-anchor="end">21:05</text>
         <use href="#read" x="569" y="445.5" stroke="#fff"/>
@@ -188,7 +188,7 @@
       <rect x="322.5" y="511.5" width="235" height="33" rx="16.5" fill="#16232d" stroke="#fff" stroke-opacity=".16"/>
       <text class="a hint" x="338" y="533" font-size="14" fill="#7f8f9e">Message</text>
       <g class="a typed">
-        <text x="338" y="533" font-size="13.5" fill="#fff" textLength="204" lengthAdjust="spacing">@spiw_bot vm.tiktok.com/ZMh2k9q</text>
+        <text x="338" y="533" font-size="13.5" fill="#fff" textLength="198" lengthAdjust="spacing">@spiwbot vm.tiktok.com/ZMh2k9q</text>
         <g clip-path="url(#field)">
           <g class="a cover">
             <rect x="338" y="515" width="220" height="26" fill="#16232d"/>

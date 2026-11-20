@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src=".github/readme/hero.svg" alt="spiw-bot. Paste a link. Send the video." width="100%">
+# spiw-bot
 
-### Turn a TikTok, Instagram or X link into the real video, right in the chat you are typing in.
+**Turn a TikTok, Instagram or X link into the real video, right in the chat you are typing in.**
 
 </div>
 
@@ -91,33 +91,6 @@ Counts the videos delivered.
 
 </details>
 
-## Security model
-
-<img src=".github/readme/sandbox.svg" alt="The bot and cobalt share one network namespace behind a firewall sidecar. Host services, private networks, cloud metadata and the host's own address are unreachable. Only outbound traffic to the public internet is allowed." width="100%">
-
-<details>
-<summary>What is locked down</summary>
-
-- **Jail.** `docker-compose.yml` runs the bot and cobalt in one network
-  namespace behind a firewall sidecar ([fw/fw.sh](fw/fw.sh)): no published
-  ports, outbound traffic to the public internet only. The host, its private
-  networks, other containers and cloud metadata are unreachable. Containers run
-  as unprivileged users with no capabilities and a read-only root.
-- **Image.** `FROM scratch`: the binary and a CA bundle, nothing to run a
-  shell with.
-- **Private cobalt.** The instance listens on loopback and requires an API
-  key, as its [docs](https://github.com/imputnet/cobalt/blob/main/docs/protect-an-instance.md)
-  recommend. Services the bot does not use are disabled.
-- **No SSRF.** Every URL that comes from a user or from a cobalt instance goes
-  through an HTTP client that refuses private and loopback addresses, also
-  after DNS resolution and redirects. API keys are only ever sent back to the
-  instance they belong to.
-- **Bounded memory.** One global budget caps the media bytes held in RAM, and
-  every body read from the network has a size limit.
-- `unsafe` is forbidden in the crate.
-
-</details>
-
 ## Quick start
 
 Build anywhere; the target is a static Linux binary:
@@ -143,6 +116,29 @@ docker compose up -d
 
 In @BotFather turn on inline mode (`/setinline`) and set inline feedback to
 100% (`/setinlinefeedback`), or the bot is never told that a card was sent.
+
+<details>
+<summary>Security model</summary>
+
+- **Jail.** `docker-compose.yml` runs the bot and cobalt in one network
+  namespace behind a firewall sidecar ([fw/fw.sh](fw/fw.sh)): no published
+  ports, outbound traffic to the public internet only. The host, its private
+  networks, other containers and cloud metadata are unreachable. Containers run
+  as unprivileged users with no capabilities and a read-only root.
+- **Image.** `FROM scratch`: the binary and a CA bundle, nothing to run a
+  shell with.
+- **Private cobalt.** The instance listens on loopback and requires an API
+  key, as its [docs](https://github.com/imputnet/cobalt/blob/main/docs/protect-an-instance.md)
+  recommend. Services the bot does not use are disabled.
+- **No SSRF.** Every URL that comes from a user or from a cobalt instance goes
+  through an HTTP client that refuses private and loopback addresses, also
+  after DNS resolution and redirects. API keys are only ever sent back to the
+  instance they belong to.
+- **Bounded memory.** One global budget caps the media bytes held in RAM, and
+  every body read from the network has a size limit.
+- `unsafe` is forbidden in the crate.
+
+</details>
 
 <details>
 <summary>Configuration</summary>
