@@ -1,7 +1,7 @@
 //! Link handling per platform: whitelist, canonical URL, (for X) the post text, and (for
-//! Instagram) what to do about a post cobalt cannot read.
+//! Instagram) the post's files as its own page lists them.
 //!
-//! Media itself is resolved by cobalt, but for a lone Instagram photo; this module never downloads media.
+//! Other media is resolved by cobalt; this module never downloads media.
 
 mod instagram;
 mod x;
@@ -14,7 +14,7 @@ use reqwest::header::{ACCEPT, USER_AGENT};
 
 use crate::model::Platform;
 
-pub use instagram::Fallback;
+pub use instagram::Found;
 
 const BROWSER_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 const HTML_ACCEPT: &str = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
@@ -94,10 +94,20 @@ pub async fn details(http: &reqwest::Client, post: &Normalized, timeout: Duratio
     }
 }
 
-/// For an Instagram post cobalt could not read: its photo, or why Instagram hides it.
-pub async fn instagram_fallback(http: &reqwest::Client, post_url: &str, timeout: Duration) -> Option<Fallback> {
+/// An Instagram post as its page shows a logged-out visitor. `None` when the page is no help.
+pub async fn instagram_media(http: &reqwest::Client, post_url: &str, timeout: Duration) -> Option<Found> {
+    instagram::media(http, &instagram_id(post_url)?, timeout).await
+}
+
+/// Why Instagram hides a post nothing could read, if it says.
+pub async fn instagram_gate(http: &reqwest::Client, post_url: &str, timeout: Duration) -> Option<Found> {
+    instagram::gate(http, &instagram_id(post_url)?, timeout).await
+}
+
+/// The id of a stored Instagram post, safe to put in a URL.
+fn instagram_id(post_url: &str) -> Option<String> {
     let (_, id) = instagram(&Url::parse(post_url).ok()?)?;
-    instagram::fallback(http, &id, timeout).await
+    id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-').then_some(id)
 }
 
 /// Force https, drop the fragment and trailing slashes.
@@ -334,6 +344,13 @@ mod tests {
         check("https://www.instagram.com/someone/", None).await;
         check("https://www.instagram.com/stories/someone/1", None).await;
         check("https://www.instagram.com/someone/p/Cx1", None).await;
+    }
+
+    #[test]
+    fn instagram_id_is_safe_in_a_url() {
+        assert_eq!(instagram_id("https://www.instagram.com/reel/Cx_-1").as_deref(), Some("Cx_-1"));
+        assert_eq!(instagram_id("https://www.instagram.com/p/a%2F..%2Fb"), None);
+        assert_eq!(instagram_id("https://x.com/a/status/1"), None);
     }
 
     #[tokio::test]

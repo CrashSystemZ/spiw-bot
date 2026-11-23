@@ -5,7 +5,7 @@ use std::{
     error::Error as StdError,
     path::Path,
     sync::{Arc, Mutex, MutexGuard, PoisonError},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use grammers_client::{
@@ -23,7 +23,7 @@ use crate::{
     config::Config,
     db::Db,
     error::{Error, Result},
-    meta::{self, Fallback, Normalized},
+    meta::{self, Found, Normalized},
     model::{FileRef, MediaKind, Platform, Post, post_key},
     net, probe,
     tg::{self, InlineId, Tg, Upload},
@@ -35,6 +35,9 @@ const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 const PARALLEL_FETCHES: usize = 4;
 /// Starts the id of an inline result that carries the file itself rather than a placeholder.
 const READY: &str = "+";
+/// How long an inline query waits for its post to be built, so it can offer the file itself
+/// instead of a placeholder. Past this, the placeholder is offered and the build goes on.
+const READY_WAIT: Duration = Duration::from_secs(2);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,10 +108,14 @@ impl App {
 
     // ---- inline query: offer the post, or a placeholder for one not uploaded yet -----------
 
-    async fn on_query(&self, query: &InlineQuery) {
+    async fn on_query(self: &Arc<Self>, query: &InlineQuery) {
         let answer = |results: Vec<tl::enums::InputBotInlineResult>| query.answer(results).cache_time(0).private();
         let title = format!("📤 {}", self.text.click_to_send);
-        let results = match self.prepare(query.text()).await {
+        let prepared = match self.prepare(query.text()).await {
+            Ok(Some(post)) => self.prefetch(post).await.map(Some),
+            other => other,
+        };
+        let results = match prepared {
             Ok(Some(post)) => {
                 if let Some((files @ [first, ..], caption)) = ready(&post) {
                     let result = tg::file_result(format!("{READY}{}", post.key), &title, first, caption, paging(&post.key, 0, files.len()));
@@ -162,6 +169,25 @@ impl App {
         Ok(self.db.post(&key, 0)?)
     }
 
+    /// Starts building the post while the user looks at the results, and waits a moment for it:
+    /// a post built by then is offered as the file itself, and one that failed shows why.
+    async fn prefetch(self: &Arc<Self>, post: Post) -> Result<Post> {
+        if ready(&post).is_some() {
+            return Ok(post);
+        }
+        let key = post.key.clone();
+        let app = Arc::clone(self);
+        let build = tokio::spawn(async move {
+            let (media, _) = tokio::join!(app.media(&post), app.caption(&post));
+            media.map(drop)
+        });
+        // past the wait the task keeps running, and the send waits for it
+        if let Ok(Ok(Err(error))) = tokio::time::timeout(READY_WAIT, build).await {
+            return Err(error);
+        }
+        self.db.post(&key, 0)?.ok_or(Error::Expired)
+    }
+
     // ---- a result was sent: replace the placeholder with the media ---------------------------
 
     async fn on_sent(self: &Arc<Self>, sent: &InlineSend) {
@@ -169,11 +195,12 @@ impl App {
         if let Some(key) = id.strip_prefix(READY).filter(|key| is_key(key)) {
             // the user sent the file itself; there is nothing to replace
             let files = self.db.post(key, 0).ok().flatten().and_then(|post| post.media).unwrap_or_default();
-            return self.count(key, &files);
+            return self.count(key, &files, Duration::ZERO);
         }
         let (true, Some(message)) = (is_key(id), sent.message_id()) else { return };
+        let start = Instant::now();
         match self.deliver(id, &message, 0).await {
-            Ok(files) => self.count(id, &files),
+            Ok(files) => self.count(id, &files, start.elapsed()),
             Err(error) => {
                 warn!(key = id, %error, "delivery failed");
                 if let Err(error) = self.tg.edit(&message, self.user_message(&error), None, None).await {
@@ -183,7 +210,8 @@ impl App {
         }
     }
 
-    fn count(&self, key: &str, files: &[FileRef]) {
+    /// `waited` is how long the placeholder was up.
+    fn count(&self, key: &str, files: &[FileRef], waited: Duration) {
         let kinds: Vec<_> = files
             .iter()
             .filter_map(|file| match file.kind {
@@ -195,7 +223,7 @@ impl App {
         if let Err(error) = self.db.record_deliveries(&kinds, now_ms()) {
             warn!(%error, "could not record delivery");
         }
-        info!(key, files = files.len(), "delivered");
+        info!(key, files = files.len(), waited_ms = waited.as_millis(), "delivered");
     }
 
     /// A paging button was pressed: show the file it stands for.
@@ -268,7 +296,9 @@ impl App {
             return Ok(files);
         }
         let _job = self.jobs.acquire().await.map_err(|_| Error::Internal("shutting down".into()))?;
+        let start = Instant::now();
         let files = self.build(post).await?;
+        info!(key = post.key, files = files.len(), ms = start.elapsed().as_millis(), "built");
         self.db.set_media(&post.key, Some(&files))?;
         Ok(files)
     }
@@ -276,9 +306,9 @@ impl App {
     /// Resolves the post through cobalt and stores each of its files on Telegram, a few at a time.
     async fn build(self: &Arc<Self>, post: &Post) -> Result<Vec<FileRef>> {
         let limit = Arc::new(Semaphore::new(PARALLEL_FETCHES));
-        let sources = match self.cobalt.resolve(&post.url).await {
-            Err(Error::Unavailable(why)) if post.platform == Platform::Instagram => self.instagram(post, why).await?,
-            sources => sources?,
+        let sources = match post.platform {
+            Platform::Instagram => self.instagram(post).await?,
+            _ => self.cobalt.resolve(&post.url).await?,
         };
         let mut fetches = JoinSet::new();
         for (index, source) in sources.into_iter().enumerate() {
@@ -298,13 +328,24 @@ impl App {
         Ok(files.into_iter().map(|(_, file)| file).collect())
     }
 
-    /// Cobalt reads neither a lone Instagram photo nor why Instagram hides a post.
-    async fn instagram(&self, post: &Post, why: String) -> Result<Vec<Resolved>> {
-        match meta::instagram_fallback(&self.http, &post.url, self.cfg.resolve_timeout).await {
-            Some(Fallback::Photo(url)) => Ok(vec![Resolved { url, file_name: None, hint: Some(Hint::Photo) }]),
-            Some(Fallback::Private) => Err(Error::Private),
-            Some(Fallback::AgeRestricted) => Err(Error::AgeRestricted),
-            None => Err(Error::Unavailable(why)),
+    /// Instagram's own post page first: it is as quick as cobalt and also has lone photos and
+    /// photos set to music, which cobalt gets wrong. Cobalt is the fallback, and a post neither
+    /// can read is checked for why Instagram hides it.
+    async fn instagram(&self, post: &Post) -> Result<Vec<Resolved>> {
+        let timeout = self.cfg.resolve_timeout;
+        let found = match meta::instagram_media(&self.http, &post.url, timeout).await {
+            Some(found) => found,
+            None => match self.cobalt.resolve(&post.url).await {
+                Err(Error::Unavailable(why)) => meta::instagram_gate(&self.http, &post.url, timeout).await.ok_or(Error::Unavailable(why))?,
+                resolved => return resolved,
+            },
+        };
+        match found {
+            Found::Media(files) => {
+                Ok(files.into_iter().map(|(url, video)| Resolved { url, file_name: None, hint: Some(if video { Hint::Video } else { Hint::Photo }) }).collect())
+            }
+            Found::Private => Err(Error::Private),
+            Found::AgeRestricted => Err(Error::AgeRestricted),
         }
     }
 
