@@ -21,6 +21,8 @@ imagesize = "0.15"
 mp3-duration = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+image-webp = "0.2"
+jpeg-encoder = "0.7"
 
 [profile.release]
 opt-level = 3

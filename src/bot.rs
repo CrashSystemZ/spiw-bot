@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     error::Error as StdError,
+    path::Path,
     sync::{Arc, Mutex, MutexGuard, PoisonError},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -310,8 +311,17 @@ impl App {
     /// Downloads one file into memory and stores it on Telegram.
     async fn fetch(&self, source: &Resolved) -> Result<FileRef> {
         let file = self.cobalt.download(&source.url, source.file_name.as_deref(), self.cfg.max_item_bytes, &self.budget).await?;
-        let probe = probe::probe(&file.data);
+        // Telegram takes no WebP photo, and some Instagram photos exist only as WebP
+        let jpeg = match probe::container(&file.data) {
+            Some(("webp", _)) => webp_to_jpeg(file.data.clone()).await,
+            _ => None,
+        };
+        let data = jpeg.as_deref().unwrap_or(&file.data);
+        let probe = probe::probe(data);
+        let container = probe::container(data);
         let kind = match (probe.kind, source.hint) {
+            // a WebP that did not become a JPEG still goes, as a file
+            (Some(MediaKind::Photo), _) if container.is_some_and(|(extension, _)| extension == "webp") => MediaKind::Document,
             // instances that do not convert gifs hand out the silent mp4 and say what it is
             (Some(MediaKind::Video) | None, Some(Hint::Gif)) => MediaKind::Animation,
             (Some(kind), _) => kind,
@@ -319,15 +329,21 @@ impl App {
             (None, Some(Hint::Video)) => MediaKind::Video,
             (None, _) => probe::kind_from_name(&file.file_name, file.mime.as_deref()),
         };
-        let (extension, mime) = match (probe::container(&file.data), kind) {
+        let (extension, mime) = match (container, kind) {
             (Some(("mp4", _)), MediaKind::Audio) => ("m4a", "audio/mp4"),
             (Some(found), _) => found,
             (None, _) => ("", file.mime.as_deref().unwrap_or("application/octet-stream")),
         };
         // Telegram refuses a photo whose name has no image extension, and tunnel links carry no name
-        let name = if extension.is_empty() || file.file_name.contains('.') { file.file_name.clone() } else { format!("{}.{extension}", file.file_name) };
-        debug!(name, mime, ?kind, bytes = file.data.len(), "uploading");
-        self.tg.upload(Upload { data: &file.data, name: &name, mime, kind, probe }).await
+        let name = if jpeg.is_some() {
+            Path::new(&file.file_name).with_extension(extension).to_string_lossy().into_owned()
+        } else if extension.is_empty() || file.file_name.contains('.') {
+            file.file_name.clone()
+        } else {
+            format!("{}.{extension}", file.file_name)
+        };
+        debug!(name, mime, ?kind, bytes = data.len(), "uploading");
+        self.tg.upload(Upload { data, name: &name, mime, kind, probe }).await
     }
 
     /// Caption for the post, fetched once. Empty when the platform's captions are not shown.
@@ -419,6 +435,26 @@ fn is_stats_command(text: &str) -> bool {
 fn now_ms() -> i64 {
     let since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or(Duration::ZERO);
     i64::try_from(since_epoch.as_millis()).unwrap_or(i64::MAX)
+}
+
+/// The image as a JPEG, or `None` when it cannot be read or is too large for a Telegram photo.
+async fn webp_to_jpeg(webp: Vec<u8>) -> Option<Vec<u8>> {
+    tokio::task::spawn_blocking(move || {
+        let mut decoder = image_webp::WebPDecoder::new(std::io::Cursor::new(webp)).ok()?;
+        let (width, height) = decoder.dimensions();
+        // Telegram's limit for a photo, which also bounds the memory the pixels take
+        if width + height > 10_000 {
+            return None;
+        }
+        let mut pixels = vec![0; decoder.output_buffer_size()?];
+        decoder.read_image(&mut pixels).ok()?;
+        let color = if decoder.has_alpha() { jpeg_encoder::ColorType::Rgba } else { jpeg_encoder::ColorType::Rgb };
+        let mut jpeg = Vec::new();
+        jpeg_encoder::Encoder::new(&mut jpeg, 90).encode(&pixels, u16::try_from(width).ok()?, u16::try_from(height).ok()?, color).ok()?;
+        Some(jpeg)
+    })
+    .await
+    .ok()?
 }
 
 /// Title and text of a post as one caption, without saying the same thing twice.
@@ -529,6 +565,20 @@ mod tests {
         assert_eq!(ready(&post(crate::model::Platform::Tiktok, Some("ignored"), Some(vec![file.clone()]))).unwrap().1, "");
         assert!(ready(&post(crate::model::Platform::X, None, Some(vec![file.clone()]))).is_none(), "caption not fetched yet");
         assert_eq!(ready(&post(crate::model::Platform::X, Some("text"), Some(vec![file]))).unwrap().1, "text");
+    }
+
+    #[tokio::test]
+    async fn webp_becomes_a_jpeg_photo() {
+        for (color, bytes) in [(image_webp::ColorType::Rgb8, 3), (image_webp::ColorType::Rgba8, 4)] {
+            let mut webp = Vec::new();
+            image_webp::WebPEncoder::new(&mut webp).encode(&vec![200; 3 * 2 * bytes], 3, 2, color).unwrap();
+            assert_eq!(probe::container(&webp), Some(("webp", "image/webp")));
+            let jpeg = webp_to_jpeg(webp).await.unwrap();
+            assert_eq!(probe::container(&jpeg), Some(("jpg", "image/jpeg")));
+            let found = probe::probe(&jpeg);
+            assert_eq!((found.kind, found.width, found.height), (Some(MediaKind::Photo), 3, 2));
+        }
+        assert!(webp_to_jpeg(b"RIFF\0\0\0\0WEBPVP8 broken".to_vec()).await.is_none());
     }
 
     #[test]
