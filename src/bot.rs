@@ -22,8 +22,8 @@ use crate::{
     config::Config,
     db::Db,
     error::{Error, Result},
-    meta::{self, Normalized},
-    model::{FileRef, MediaKind, Post, post_key},
+    meta::{self, Fallback, Normalized},
+    model::{FileRef, MediaKind, Platform, Post, post_key},
     net, probe,
     tg::{self, InlineId, Tg, Upload},
     url,
@@ -42,6 +42,8 @@ struct Messages {
     unsupported_link: String,
     media_too_large: String,
     media_unavailable: String,
+    media_private: String,
+    media_age_restricted: String,
     local_processing_unsupported: String,
     try_again: String,
     click_to_send: String,
@@ -273,8 +275,12 @@ impl App {
     /// Resolves the post through cobalt and stores each of its files on Telegram, a few at a time.
     async fn build(self: &Arc<Self>, post: &Post) -> Result<Vec<FileRef>> {
         let limit = Arc::new(Semaphore::new(PARALLEL_FETCHES));
+        let sources = match self.cobalt.resolve(&post.url).await {
+            Err(Error::Unavailable(why)) if post.platform == Platform::Instagram => self.instagram(post, why).await?,
+            sources => sources?,
+        };
         let mut fetches = JoinSet::new();
-        for (index, source) in self.cobalt.resolve(&post.url).await?.into_iter().enumerate() {
+        for (index, source) in sources.into_iter().enumerate() {
             let (app, limit) = (Arc::clone(self), Arc::clone(&limit));
             fetches.spawn(async move {
                 let _slot = limit.acquire().await;
@@ -289,6 +295,16 @@ impl App {
         }
         files.sort_unstable_by_key(|(index, _)| *index);
         Ok(files.into_iter().map(|(_, file)| file).collect())
+    }
+
+    /// Cobalt reads neither a lone Instagram photo nor why Instagram hides a post.
+    async fn instagram(&self, post: &Post, why: String) -> Result<Vec<Resolved>> {
+        match meta::instagram_fallback(&self.http, &post.url, self.cfg.resolve_timeout).await {
+            Some(Fallback::Photo(url)) => Ok(vec![Resolved { url, file_name: None, hint: Some(Hint::Photo) }]),
+            Some(Fallback::Private) => Err(Error::Private),
+            Some(Fallback::AgeRestricted) => Err(Error::AgeRestricted),
+            None => Err(Error::Unavailable(why)),
+        }
     }
 
     /// Downloads one file into memory and stores it on Telegram.
@@ -357,6 +373,8 @@ impl App {
             Error::Unsupported => &self.text.unsupported_link,
             Error::TooLarge => &self.text.media_too_large,
             Error::LocalProcessing => &self.text.local_processing_unsupported,
+            Error::Private => &self.text.media_private,
+            Error::AgeRestricted => &self.text.media_age_restricted,
             Error::Expired | Error::Unavailable(_) => &self.text.media_unavailable,
             Error::Telegram(_) | Error::Internal(_) => &self.text.try_again,
         }

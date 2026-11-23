@@ -3,6 +3,8 @@
     "unsupportedLink": "Link not supported 😩",
     "mediaTooLarge": "This media is too large 👀",
     "mediaUnavailable": "Failed to get media 😵‍💫",
+    "mediaPrivate": "Failed to get media: the account is private 🔒",
+    "mediaAgeRestricted": "Failed to get media: it is 18+ 🔞",
     "localProcessingUnsupported": "This media requires local processing and is not supported yet 🫠",
     "tryAgain": "Something went wrong, try again later 🧠",
     "clickToSend": "Click to send",

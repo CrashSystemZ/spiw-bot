@@ -1,7 +1,9 @@
-//! Link handling per platform: whitelist, canonical URL, and (for X) the post text.
+//! Link handling per platform: whitelist, canonical URL, (for X) the post text, and (for
+//! Instagram) what to do about a post cobalt cannot read.
 //!
-//! Media itself is resolved by cobalt; this module never downloads media.
+//! Media itself is resolved by cobalt, but for a lone Instagram photo; this module never downloads media.
 
+mod instagram;
 mod x;
 
 use std::fmt::Write as _;
@@ -11,6 +13,8 @@ use reqwest::Url;
 use reqwest::header::{ACCEPT, USER_AGENT};
 
 use crate::model::Platform;
+
+pub use instagram::Fallback;
 
 const BROWSER_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 const HTML_ACCEPT: &str = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
@@ -88,6 +92,12 @@ pub async fn details(http: &reqwest::Client, post: &Normalized, timeout: Duratio
         Platform::X => x::details(http, post, timeout).await,
         Platform::Tiktok | Platform::Instagram => Ok(Details::default()),
     }
+}
+
+/// For an Instagram post cobalt could not read: its photo, or why Instagram hides it.
+pub async fn instagram_fallback(http: &reqwest::Client, post_url: &str, timeout: Duration) -> Option<Fallback> {
+    let (_, id) = instagram(&Url::parse(post_url).ok()?)?;
+    instagram::fallback(http, &id, timeout).await
 }
 
 /// Force https, drop the fragment and trailing slashes.

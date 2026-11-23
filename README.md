@@ -181,7 +181,8 @@ src/
 ├── bot.rs      handlers and the delivery pipeline
 ├── tg.rs       upload and inline-message editing over raw MTProto
 ├── cobalt.rs   cobalt API client, instance failover, memory budget
-├── meta/       link whitelist and canonical URLs per platform, X post text
+├── meta/       link whitelist and canonical URLs per platform, X post text,
+│               Instagram photos and private/18+ posts cobalt cannot read
 ├── probe.rs    media type, size and duration from container headers
 ├── net.rs      HTTP clients and the private-address filter
 ├── db.rs       SQLite: posts, link aliases, stats

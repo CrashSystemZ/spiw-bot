@@ -311,14 +311,11 @@ fn content_error(code: &str) -> Option<Error> {
             Some(Error::Unsupported)
         }
         "error.api.content.too_long" => Some(Error::TooLarge),
-        "error.api.content.video.unavailable"
-        | "error.api.content.video.live"
-        | "error.api.content.video.private"
-        | "error.api.content.video.age"
-        | "error.api.content.video.region"
-        | "error.api.content.post.unavailable"
-        | "error.api.content.post.private"
-        | "error.api.content.post.age" => Some(Error::Unavailable(code.into())),
+        "error.api.content.video.private" | "error.api.content.post.private" => Some(Error::Private),
+        "error.api.content.video.age" | "error.api.content.post.age" => Some(Error::AgeRestricted),
+        "error.api.content.video.unavailable" | "error.api.content.video.live" | "error.api.content.video.region" | "error.api.content.post.unavailable" => {
+            Some(Error::Unavailable(code.into()))
+        }
         _ => None,
     }
 }
@@ -380,7 +377,9 @@ mod tests {
     fn classifies_errors() {
         assert!(matches!(content_error("error.api.link.unsupported"), Some(Error::Unsupported)));
         assert!(matches!(content_error("error.api.content.too_long"), Some(Error::TooLarge)));
-        assert!(matches!(content_error("error.api.content.post.private"), Some(Error::Unavailable(_))));
+        assert!(matches!(content_error("error.api.content.post.private"), Some(Error::Private)));
+        assert!(matches!(content_error("error.api.content.video.age"), Some(Error::AgeRestricted)));
+        assert!(matches!(content_error("error.api.content.post.unavailable"), Some(Error::Unavailable(_))));
         assert!(content_error("error.api.fetch.fail").is_none());
         assert!(content_error("error.api.auth.key.invalid").is_none());
     }
